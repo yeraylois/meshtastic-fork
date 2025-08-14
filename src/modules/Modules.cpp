@@ -1,4 +1,5 @@
 #include "configuration.h"
+
 #if !MESHTASTIC_EXCLUDE_INPUTBROKER
 #include "buzz/BuzzerFeedbackThread.h"
 #include "input/ExpressLRSFiveWay.h"
@@ -8,6 +9,7 @@
 #include "input/TrackballInterruptImpl1.h"
 #include "input/UpDownInterruptImpl1.h"
 #include "modules/SystemCommandsModule.h"
+
 #if !MESHTASTIC_EXCLUDE_I2C
 #include "input/cardKbI2cImpl.h"
 #endif
@@ -103,11 +105,99 @@
 #include "modules/DropzoneModule.h"
 #endif
 
+/*****************************************************************************
+ *                       _  _  ____  ____    __   _  _                       *
+ *                      ( \/ )( ___)(  _ \  /__\ ( \/ )                      *
+ *                       \  /  )__)  )   / /(__)\ \  /                       *
+ *                       (__) (____)(_)\_)(__)(__)(__)                       *
+ *                                                                           *
+ * ----------------------------[ MODULE SECTION ]--------------------------- *
+ *                                                                           *
+ *  Maintainer: Yeray Lois Sánchez <yerayloissanchez@gmail.com>              *
+ *  Meshtastic version: 2.7                                                  *
+ *  License: GPL-3.0                                                         *
+ *                                                                           *
+ ****************************************************************************/
+
+// ===== FEATURE SWITCHES =====
+#ifndef WS3_RS485_TALKER_ENABLE
+  #define WS3_RS485_TALKER_ENABLE 0   // 1 = ENABLE WS3 MODULE (Heltec Wireless Stick V3)
+#endif
+#ifndef T114_RS485_SLAVE_ENABLE
+  #define T114_RS485_SLAVE_ENABLE 0   // 1 = ENABLE T114 MODULE (Heltec Mesh Node T114 v2.0)
+#endif
+#ifndef T114_OPTO_PM_ENABLE
+  #define T114_OPTO_PM_ENABLE 0
+#endif
+#ifndef WS3_OPTO_PM_ENABLE
+  #define WS3_OPTO_PM_ENABLE 0
+#endif
+
+// ==== SANITY CHECK (BOTH MODULE CAN'T BE ENABLED AT THE SAME TIME) ====
+#if WS3_RS485_TALKER_ENABLE && T114_RS485_SLAVE_ENABLE
+  #error "ENABLE ONLY ONE MODULE: WS3_RS485_TALKER_ENABLE o T114_RS485_SLAVE_ENABLE"
+#endif
+
+#if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_RS485_TALKER_ENABLE
+  #include "modules/Ws3Rs485TalkerModule.h"
+#endif
+
+#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_RS485_SLAVE_ENABLE
+  #include "modules/T114Rs485SlaveModule.h"
+#endif
+
+#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_OPTO_PM_ENABLE
+  #include "modules/T114OptoPMModule.h"
+#endif
+
+#if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_OPTO_PM_ENABLE
+  #include "modules/Ws3OptoPMModule.h"
+#endif
+
+
 /**
  * Create module instances here.  If you are adding a new module, you must 'new' it here (or somewhere else)
  */
 void setupModules()
 {
+#if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_RS485_TALKER_ENABLE
+    new Ws3Rs485TalkerModule();
+    // return;
+#endif
+
+#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_RS485_SLAVE_ENABLE
+    new T114Rs485SlaveModule();
+    // return;
+#endif
+
+#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_OPTO_PM_ENABLE
+  new T114OptoPMModule();
+  // return;
+#endif
+
+#if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_OPTO_PM_ENABLE
+  new Ws3OptoPMModule();
+  // return;
+#endif
+
+/*
+#if BOARD_HELTEC_MESH_NODE_T114_V2_0
+  if (effective == RS485_ONLY) {
+    LOG_INFO("Registering T114 RS485 duplex module (RS485_ONLY)\n");
+    new Rs485DuplexModule();
+    new OptoPMModule();
+    return;
+  } else {
+    new OptoPMModule();
+  }
+#endif
+*/
+
+/*****************************************************************************
+ * ---------------------------[ END OF MODULE ]----------------------------- * 
+ ****************************************************************************/
+
+
     if (config.device.role != meshtastic_Config_DeviceConfig_Role_REPEATER) {
 #if (HAS_BUTTON || ARCH_PORTDUINO) && !MESHTASTIC_EXCLUDE_INPUTBROKER
         if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR) {
@@ -161,8 +251,12 @@ void setupModules()
 #if !MESHTASTIC_EXCLUDE_POWERSTRESS
         new PowerStressModule();
 #endif
-        // Example: Put your module here
-        // new ReplyModule();
+
+ /*  Add your custom modules here following Meshtastic's module architecture. *
+  *  Example:                                                                 *
+  *    new YourModuleClass();    
+  */ 
+
 #if (HAS_BUTTON || ARCH_PORTDUINO) && !MESHTASTIC_EXCLUDE_INPUTBROKER
         if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR) {
             rotaryEncoderInterruptImpl1 = new RotaryEncoderInterruptImpl1();
