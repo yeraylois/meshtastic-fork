@@ -119,15 +119,9 @@
  *                                                                           *
  ****************************************************************************/
 
-// ===== FEATURE SWITCHES =====
+// ============================ FEATURE SWITCHES ============================
 #ifndef WS3_RS485_TALKER_ENABLE
 #define WS3_RS485_TALKER_ENABLE 0 // 1 = ENABLE WS3 MODULE (Heltec Wireless Stick V3)
-#endif
-#ifndef T114_RS485_SLAVE_ENABLE
-#define T114_RS485_SLAVE_ENABLE 0 // 1 = ENABLE T114 MODULE (Heltec Mesh Node T114 v2.0)
-#endif
-#ifndef T114_OPTO_PM_ENABLE
-#define T114_OPTO_PM_ENABLE 0
 #endif
 #ifndef WS3_OPTO_PM_ENABLE
 #define WS3_OPTO_PM_ENABLE 0
@@ -135,15 +129,38 @@
 #ifndef WS3_FLAG_ENABLE
 #define WS3_FLAG_ENABLE 0
 #endif
+// --------------------------------------------------------------------------
+#ifndef T114_RS485_SLAVE_ENABLE
+#define T114_RS485_SLAVE_ENABLE 0 // 1 = ENABLE T114 MODULE (Heltec Mesh Node T114 v2.0)
+#endif
+#ifndef T114_OPTO_PM_ENABLE
+#define T114_OPTO_PM_ENABLE 0
+#endif
+#ifndef T114_FLAG_ENABLE
+#define T114_FLAG_ENABLE 0
+#endif
+// ======================================================================
 
 // ==== SANITY CHECK (BOTH MODULE CAN'T BE ENABLED AT THE SAME TIME) ====
 #if WS3_RS485_TALKER_ENABLE && T114_RS485_SLAVE_ENABLE
 #error "ENABLE ONLY ONE MODULE: WS3_RS485_TALKER_ENABLE o T114_RS485_SLAVE_ENABLE"
 #endif
+// ======================================================================
 
 #if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_RS485_TALKER_ENABLE
 #include "modules/Ws3Rs485TalkerModule.h"
 #endif
+
+#if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_OPTO_PM_ENABLE
+#include "modules/Ws3OptoPMModule.h"
+#include "modules/Ws3OptoFlagBridgeModule.h"
+#endif
+
+#if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_FLAG_ENABLE
+#include "flags/Ws3FlagStore.h"
+#endif
+
+// --------------------------------------------------------------------------
 
 #if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_RS485_SLAVE_ENABLE
 #include "modules/T114Rs485SlaveModule.h"
@@ -151,15 +168,14 @@
 
 #if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_OPTO_PM_ENABLE
 #include "modules/T114OptoPMModule.h"
+#include "modules/T114OptoFlagBridgeModule.h"
 #endif
 
-#if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_OPTO_PM_ENABLE
-#include "modules/Ws3OptoFlagBridgeModule.h"
+#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_FLAG_ENABLE
+#include "flags/T114FlagStore.h"
 #endif
 
-#if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_FLAG_ENABLE
-#include "flags/Ws3FlagStore.h"
-#endif
+// ======================================================================
 
 /**
  * Create module instances here.  If you are adding a new module, you must 'new' it here (or somewhere else)
@@ -184,33 +200,10 @@ void setupModules()
                 // return;
 #endif
 
-#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_RS485_SLAVE_ENABLE
-                new T114Rs485SlaveModule();
-                // return;
-#endif
-
-#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_OPTO_PM_ENABLE
-                new T114OptoPMModule();
-                // return;
-#endif
-
 #if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_OPTO_PM_ENABLE
                 new Ws3OptoFlagBridgeModule();
                 // return;
 #endif
-
-                /*
-                #if BOARD_HELTEC_MESH_NODE_T114_V2_0
-                  if (effective == RS485_ONLY) {
-                    LOG_INFO("Registering T114 RS485 duplex module (RS485_ONLY)\n");
-                    new Rs485DuplexModule();
-                    new OptoPMModule();
-                    return;
-                  } else {
-                    new OptoPMModule();
-                  }
-                #endif
-                */
                 return;
         }
         else
@@ -219,12 +212,42 @@ void setupModules()
                 Ws3FlagStore::print();
         }
 #endif
+
+#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_FLAG_ENABLE
+
+        // (INIT GPREGRET2 AND DECIDE PHASE)
+        T114FlagStore::begin();
+        const uint32_t flag = T114FlagStore::get();
+        LOG_INFO("[MODULES.CPP] T114 ACTUAL FLAG: 0x%08" PRIX32 "\n", flag);
+
+        const bool bootstrapPhase = (flag == T114_FLAG_DEFAULT) || (flag == T114_FLAG_OPTO_POWER_OK);
+
+        if (bootstrapPhase)
+        {
+                LOG_INFO("[MODULES.CPP] BOOTSTRAP PHASE (flag = DEFAULT)");
+
+#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_RS485_SLAVE_ENABLE
+                new T114Rs485SlaveModule();
+                // return;
+#endif
+#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_OPTO_PM_ENABLE
+                new T114OptoFlagBridgeModule();
+#endif
+                return;
+        }
+        else
+        {
+                T114FlagStore::writeDefault();
+                T114FlagStore::print();
+        }
+#endif
+
         // (NORMAL PHASE)
         LOG_INFO("[MODULES.CPP] NORMAL PHASE (flag != DEFAULT)");
 
-        /*****************************************************************************
-         * ---------------------------[ END OF MODULE ]----------------------------- *
-         ****************************************************************************/
+/*****************************************************************************
+ * ---------------------------[ END OF MODULE ]----------------------------- *
+ ****************************************************************************/
 
         if (config.device.role != meshtastic_Config_DeviceConfig_Role_REPEATER)
         {
