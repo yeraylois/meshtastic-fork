@@ -6,6 +6,8 @@
 
 #include "Ws3OptoFlagBridgeModule.h"
 
+#if defined(BOARD_HELTEC_WIRELESS_STICK_V3)
+
 #define LOG_TAG "opto_flag_ws3"
 #include "configuration.h"
 #include "power/PowerMonitor.h"
@@ -120,3 +122,5 @@ int32_t Ws3OptoFlagBridgeModule::runOnce()
 
   return 25;
 }
+
+#endif

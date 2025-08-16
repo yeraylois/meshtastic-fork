@@ -5,6 +5,7 @@
  **************************************************************/
 
 #pragma once
+#if defined(BOARD_HELTEC_WIRELESS_STICK_V3)
 
 #include <Arduino.h>
 #include "mesh/SinglePortModule.h"
@@ -95,3 +96,5 @@ private:
   uint32_t tNextPrint_ = 0;
   uint32_t tWriteGuard_ = 0; // SAVE WRITE GUARD TIMESTAMP
 };
+
+#endif
