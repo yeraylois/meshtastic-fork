@@ -6,6 +6,7 @@
 
 #pragma once
 
+#if defined(BOARD_HELTEC_WIRELESS_STICK_V3)
 #include <Arduino.h>
 
 // ===================== CONFIGURATION =====================
@@ -127,3 +128,5 @@ private:
   static bool inited_;
   Ws3FlagStore() = delete;
 };
+
+#endif

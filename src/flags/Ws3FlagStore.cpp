@@ -6,6 +6,8 @@
 
 #include "Ws3FlagStore.h"
 
+#if defined(BOARD_HELTEC_WIRELESS_STICK_V3)
+
 #define LOG_TAG "flag_store_ws3"
 #include "configuration.h"
 
@@ -145,3 +147,5 @@ void Ws3FlagStore::print()
              "ns", WS3_FLAG_NVS_NAMESPACE, WS3_FLAG_NVS_KEY, def(), def());
   }
 }
+
+#endif
