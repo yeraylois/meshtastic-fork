@@ -119,7 +119,7 @@
  *                                                                           *
  ****************************************************************************/
 
-// ============================ FEATURE SWITCHES ============================
+// ===== FEATURE SWITCHES =====
 #ifndef WS3_RS485_TALKER_ENABLE
 #define WS3_RS485_TALKER_ENABLE 0 // 1 = ENABLE WS3 MODULE (Heltec Wireless Stick V3)
 #endif
@@ -129,7 +129,7 @@
 #ifndef WS3_FLAG_ENABLE
 #define WS3_FLAG_ENABLE 0
 #endif
-// --------------------------------------------------------------------------
+
 #ifndef T114_RS485_SLAVE_ENABLE
 #define T114_RS485_SLAVE_ENABLE 0 // 1 = ENABLE T114 MODULE (Heltec Mesh Node T114 v2.0)
 #endif
@@ -139,7 +139,7 @@
 #ifndef T114_FLAG_ENABLE
 #define T114_FLAG_ENABLE 0
 #endif
-// ======================================================================
+// ============================
 
 // ==== SANITY CHECK (BOTH MODULE CAN'T BE ENABLED AT THE SAME TIME) ====
 #if WS3_RS485_TALKER_ENABLE && T114_RS485_SLAVE_ENABLE
@@ -160,7 +160,7 @@
 #include "flags/Ws3FlagStore.h"
 #endif
 
-// --------------------------------------------------------------------------
+// ======================================================================
 
 #if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_RS485_SLAVE_ENABLE
 #include "modules/T114Rs485SlaveModule.h"
@@ -173,6 +173,10 @@
 
 #if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_FLAG_ENABLE
 #include "flags/T114FlagStore.h"
+#endif
+
+#if defined(PB_FLAG_ENABLE)
+#include "PowerBudgetModule.h"
 #endif
 
 // ======================================================================
@@ -245,9 +249,12 @@ void setupModules()
         // (NORMAL PHASE)
         LOG_INFO("[MODULES.CPP] NORMAL PHASE (flag != DEFAULT)");
 
-/*****************************************************************************
- * ---------------------------[ END OF MODULE ]----------------------------- *
- ****************************************************************************/
+#if defined(PB_FLAG_ENABLE)
+        new PowerBudgetModule();
+#endif
+        /*****************************************************************************
+         * ---------------------------[ END OF MODULE ]----------------------------- *
+         ****************************************************************************/
 
         if (config.device.role != meshtastic_Config_DeviceConfig_Role_REPEATER)
         {
