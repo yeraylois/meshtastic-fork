@@ -32,18 +32,18 @@
  * I2C PINOUT (LOGICAL)
  *
  * HELTEC MESH NODE T114 V2.0:
- *   SDA: GPIO 7
- *   SCL: GPIO 8
+ *   SDA: GPIO 30
+ *   SCL: GPIO 31
  *
  * HELTEC WIRELESS STICK V3 (ESP32-S3):
  *   SDA: GPIO 33
  *   SCL: GPIO 34
  */
 #ifndef PB_I2C_SDA
-#define PB_I2C_SDA 7
+#define PB_I2C_SDA 30
 #endif
 #ifndef PB_I2C_SCL
-#define PB_I2C_SCL 8
+#define PB_I2C_SCL 31
 #endif
 
 /**
@@ -179,7 +179,10 @@ void PowerBudgetModule::initOnce()
 #if defined(BOARD_HELTEC_WIRELESS_STICK_V3)
     PB_WIRE.begin(PB_I2C_SDA, PB_I2C_SCL, 100000);
 #elif defined(BOARD_HELTEC_MESH_NODE_T114_V2_0)
+    PB_WIRE.end();                        // ENSURE START IN A FRESH STATE
+    PB_WIRE.setPins(PB_I2C_SDA, PB_I2C_SCL);
     PB_WIRE.begin();
+    PB_WIRE.setClock(100000);
 #endif
     delay(5);
 
@@ -194,7 +197,7 @@ void PowerBudgetModule::initOnce()
     }
 #endif
 
-    // INITIALIZE INA219 ON THE SELECTED BUS
+    // INIT INA219 ON THE SELECTED BUS
     if (!gIna.begin(&PB_WIRE))
     {
         PB_LOGI("[PowerBudget] ERROR: INA219 not detected at 0x%02X\n", (unsigned)PB_INA_ADDR);
