@@ -605,7 +605,17 @@ void NodeDB::installDefaultConfig(bool preserveKey = false)
 #else
     config.lora.modem_preset = meshtastic_Config_LoRaConfig_ModemPreset_LONG_FAST;
 #endif
+
+    /****************************************/
+
+#ifdef USERPREFS_CONFIG_LORA_HOP_LIMIT
+    config.lora.hop_limit = USERPREFS_CONFIG_LORA_HOP_LIMIT;
+#else
     config.lora.hop_limit = HOP_RELIABLE;
+#endif
+
+    /****************************************/
+
 #ifdef USERPREFS_CONFIG_LORA_IGNORE_MQTT
     config.lora.ignore_mqtt = USERPREFS_CONFIG_LORA_IGNORE_MQTT;
 #else
@@ -923,17 +933,20 @@ void NodeDB::installDefaultModuleConfig()
      *                       \  /  )__)  )   / /(__)\ \  /                       *
      *                       (__) (____)(_)\_)(__)(__)(__)                       *
      *                                                                           *
-     * -------------[ HELTEC MESH NODE T114 V2.0 -> CONFIGURATION ]------------- *
+     * ----------------------------[ CONFIGURATION ]---------------------------- *
      *                                                                           *
      *  Maintainer: Yeray Lois Sánchez <yerayloissanchez@gmail.com>              *
      *  Meshtastic version: 2.7                                                  *
      *  License: GPL-3.0                                                         *
      *                                                                           *
      ****************************************************************************/
-#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0)
+#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) || defined(BOARD_HELTEC_WIRELESS_STICK_V3)
 
     // POWER SAVING CONFIG
     config.power.is_power_saving = true; // POWER SAVING = ON
+
+    // HEARTBEAT LED OFF (LED_PIN)
+    config.device.led_heartbeat_disabled = true;
 
     // BLUETOOTH CONFIG
     config.power.wait_bluetooth_secs = 0; // NO WAIT FOR BT AT STARTUP
@@ -945,12 +958,25 @@ void NodeDB::installDefaultModuleConfig()
 
     // LORA CONFIG
     config.lora.use_preset = true;
-    config.lora.modem_preset = meshtastic_Config_LoRaConfig_ModemPreset_MEDIUM_FAST;
-    config.lora.hop_limit = 1;
-    config.lora.tx_power = 10;                  // dBm
-    config.lora.sx126x_rx_boosted_gain = false; // NORMAL RX (NO BOOST)
+    config.lora.tx_power = 14;                 // dBm for EU_868
+    config.lora.sx126x_rx_boosted_gain = true; // NORMAL RX (NO BOOST)
+
+    /**
+     * EDITED BY USERPREFS MACROS BUT INCLUDED FOR REFERENCE
+     *
+     * //config.lora.modem_preset = meshtastic_Config_LoRaConfig_ModemPreset_MEDIUM_FAST;
+     * //config.lora.hop_limit = 1;
+     *
+     */
 
 #endif
+
+#if defined(BOARD_HELTEC_WIRELESS_STICK_V3)
+
+    config.power.ls_secs = 0; // DISABLE light-sleep IN LEADER
+
+#endif
+
     /****************************************************************************
      * ------------------------[ END OF CONFIGURATION ]------------------------ *
      ****************************************************************************/
