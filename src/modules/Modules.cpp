@@ -119,7 +119,7 @@
  *                                                                           *
  ****************************************************************************/
 
-// ===== FEATURE SWITCHES =====
+// ========================== FEATURE SWITCHES ==========================
 #ifndef WS3_RS485_TALKER_ENABLE
 #define WS3_RS485_TALKER_ENABLE 0 // 1 = ENABLE WS3 MODULE (Heltec Wireless Stick V3)
 #endif
@@ -129,7 +129,7 @@
 #ifndef WS3_FLAG_ENABLE
 #define WS3_FLAG_ENABLE 0
 #endif
-
+//-----------------------------------------------------------------------
 #ifndef T114_RS485_SLAVE_ENABLE
 #define T114_RS485_SLAVE_ENABLE 0 // 1 = ENABLE T114 MODULE (Heltec Mesh Node T114 v2.0)
 #endif
@@ -139,13 +139,22 @@
 #ifndef T114_FLAG_ENABLE
 #define T114_FLAG_ENABLE 0
 #endif
-// ============================
+//-----------------------------------------------------------------------
+#ifndef PB_FLAG_ENABLE
+#define PB_FLAG_ENABLE 0
+#endif
+#ifndef TRAFFIC_LIGHT_MESH_MODULE_ENABLE
+#define TRAFFIC_LIGHT_MESH_MODULE_ENABLE 0
+#endif
+
+// ======================================================================
 
 // ==== SANITY CHECK (BOTH MODULE CAN'T BE ENABLED AT THE SAME TIME) ====
 #if WS3_RS485_TALKER_ENABLE && T114_RS485_SLAVE_ENABLE
 #error "ENABLE ONLY ONE MODULE: WS3_RS485_TALKER_ENABLE o T114_RS485_SLAVE_ENABLE"
 #endif
-// ======================================================================
+
+// ====================================================================== WS3 MODULES (Heltec Wireless Stick v3)
 
 #if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_RS485_TALKER_ENABLE
 #include "modules/Ws3Rs485TalkerModule.h"
@@ -160,7 +169,7 @@
 #include "flags/Ws3FlagStore.h"
 #endif
 
-// ======================================================================
+// ====================================================================== T114 MODULES (Heltec Mesh Node T114 v2.0)
 
 #if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_RS485_SLAVE_ENABLE
 #include "modules/T114Rs485SlaveModule.h"
@@ -175,8 +184,14 @@
 #include "flags/T114FlagStore.h"
 #endif
 
-#if defined(PB_FLAG_ENABLE)
+// ====================================================================== GENERAL MODULES (WS3 & T114)
+
+#if PB_FLAG_ENABLE
 #include "PowerBudgetModule.h"
+#endif
+
+#if TRAFFIC_LIGHT_MESH_MODULE_ENABLE
+#include "TrafficLightMeshModule.h"
 #endif
 
 // ======================================================================
@@ -249,8 +264,12 @@ void setupModules()
         // (NORMAL PHASE)
         LOG_INFO("[MODULES.CPP] NORMAL PHASE (flag != DEFAULT)");
 
-#if defined(PB_FLAG_ENABLE)
+#if PB_FLAG_ENABLE
         new PowerBudgetModule();
+#endif
+
+#if TRAFFIC_LIGHT_MESH_MODULE_ENABLE
+        new TrafficLightMeshModule();
 #endif
         /*****************************************************************************
          * ---------------------------[ END OF MODULE ]----------------------------- *
