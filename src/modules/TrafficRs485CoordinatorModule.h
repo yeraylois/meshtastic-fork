@@ -71,14 +71,14 @@
 #endif
 
 /* USER LEDS (-1 TO DISABLE) */
-#ifndef LED_RED_PIN
-#define LED_RED_PIN -1
+#ifndef RS485_LED_RED_PIN
+#define RS485_LED_RED_PIN -1
 #endif
-#ifndef LED_AMBER_PIN
-#define LED_AMBER_PIN -1
+#ifndef RS485_LED_AMBER_PIN
+#define RS485_LED_AMBER_PIN -1
 #endif
-#ifndef LED_GREEN_PIN
-#define LED_GREEN_PIN -1
+#ifndef RS485_LED_GREEN_PIN
+#define RS485_LED_GREEN_PIN -1
 #endif
 
 /* NODE IDENTIFICATION */

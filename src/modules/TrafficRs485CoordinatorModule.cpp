@@ -26,15 +26,15 @@ const uint8_t TrafficRs485CoordinatorModule::kPrio_[RS485_NUM_KNOWN_NODES] = {
 /* ===================================[ LED HELPERS ]==================================== */
 inline bool TrafficRs485CoordinatorModule::ledsPresent()
 {
-    return (LED_RED_PIN >= 0 && LED_AMBER_PIN >= 0 && LED_GREEN_PIN >= 0);
+    return (RS485_LED_RED_PIN >= 0 && RS485_LED_AMBER_PIN >= 0 && RS485_LED_GREEN_PIN >= 0);
 }
 inline void TrafficRs485CoordinatorModule::leds(bool r, bool a, bool g)
 {
     if (!ledsPresent())
         return;
-    digitalWrite(LED_RED_PIN, r ? HIGH : LOW);
-    digitalWrite(LED_AMBER_PIN, a ? HIGH : LOW);
-    digitalWrite(LED_GREEN_PIN, g ? HIGH : LOW);
+    digitalWrite(RS485_LED_RED_PIN, r ? HIGH : LOW);
+    digitalWrite(RS485_LED_AMBER_PIN, a ? HIGH : LOW);
+    digitalWrite(RS485_LED_GREEN_PIN, g ? HIGH : LOW);
 }
 
 /* ===============================[ CASE & TOPOLOGY ]==================================== */
@@ -73,9 +73,9 @@ void TrafficRs485CoordinatorModule::initOnce()
 
     if (ledsPresent())
     {
-        pinMode(LED_RED_PIN, OUTPUT);
-        pinMode(LED_AMBER_PIN, OUTPUT);
-        pinMode(LED_GREEN_PIN, OUTPUT);
+        pinMode(RS485_LED_RED_PIN, OUTPUT);
+        pinMode(RS485_LED_AMBER_PIN, OUTPUT);
+        pinMode(RS485_LED_GREEN_PIN, OUTPUT);
         leds(true, false, false); /* SAFE START -> RED */
     }
 
