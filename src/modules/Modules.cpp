@@ -194,6 +194,10 @@
 #include "TrafficLightMeshModule.h"
 #endif
 
+#if RS485_COORDINATOR_MODULE_ENABLE
+#include "TrafficRs485CoordinatorModule.h"
+#endif
+
 // ======================================================================
 
 /**
@@ -214,8 +218,8 @@ void setupModules()
         {
                 LOG_INFO("[MODULES.CPP] BOOTSTRAP PHASE (flag = DEFAULT)");
 
-#if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_RS485_TALKER_ENABLE
-                new Ws3Rs485TalkerModule();
+#if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && RS485_COORDINATOR_MODULE_ENABLE
+                new TrafficRs485CoordinatorModule();
                 // return;
 #endif
 
@@ -245,8 +249,8 @@ void setupModules()
         {
                 LOG_INFO("[MODULES.CPP] BOOTSTRAP PHASE (flag = DEFAULT)");
 
-#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_RS485_SLAVE_ENABLE
-                new T114Rs485SlaveModule();
+#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && RS485_COORDINATOR_MODULE_ENABLE
+                new TrafficRs485CoordinatorModule();
                 // return;
 #endif
 #if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_OPTO_PM_ENABLE
