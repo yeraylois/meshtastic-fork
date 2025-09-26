@@ -32,18 +32,18 @@
  * I2C PINOUT (LOGICAL)
  *
  * HELTEC MESH NODE T114 V2.0:
- *   SDA: GPIO 30
- *   SCL: GPIO 31
+ *   SDA: GPIO 13
+ *   SCL: GPIO 16
  *
  * HELTEC WIRELESS STICK V3 (ESP32-S3):
  *   SDA: GPIO 33
  *   SCL: GPIO 34
  */
 #ifndef PB_I2C_SDA
-#define PB_I2C_SDA 30
+#define PB_I2C_SDA 13
 #endif
 #ifndef PB_I2C_SCL
-#define PB_I2C_SCL 31
+#define PB_I2C_SCL 16
 #endif
 
 /**

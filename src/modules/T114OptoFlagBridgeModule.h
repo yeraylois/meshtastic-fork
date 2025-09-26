@@ -35,7 +35,7 @@
 
 // ======= PINS/CONFIG (T114 v2.0) =======
 #ifndef T114_OPTO_PM_PIN
-#define T114_OPTO_PM_PIN 28
+#define T114_OPTO_PM_PIN 33
 #endif
 #ifndef T114_OPTO_PM_LED
 #define T114_OPTO_PM_LED 7
