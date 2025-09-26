@@ -7,7 +7,7 @@
 
 // ====== DEFAULT PINS (Heltec Mesh Node T114 V2.0) ======
 #ifndef T114_OPTO_PM_PIN
-  #define T114_OPTO_PM_PIN 28        // PC817_PIN, GPIO ENTRY OPTOCOUPLER
+  #define T114_OPTO_PM_PIN 33        // PC817_PIN, GPIO ENTRY OPTOCOUPLER
 #endif
 #ifndef T114_OPTO_PM_LED
   #define T114_OPTO_PM_LED 7         // EXTERN LED INDICATOR
