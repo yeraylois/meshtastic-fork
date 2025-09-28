@@ -1,8 +1,11 @@
-/**************************************************************
- *   Project : Blackout Traffic Light System                  *
- *   Author  : Yeray Lois Sanchez                             *
- *   Email   : yerayloissanchez@gmail.com                     *
- **************************************************************/
+/***************************************************************************************************************************************
+ *   Project   : Blackout Traffic Light System                                     * Library   :
+ * Power Monitor                       * Author    : Yeray Lois Sanchez
+ *                                                                        * Email     :
+ * yerayloissanchez@gmail.com                       * Available :
+ * https://github.com/yeraylois/blackout-traffic-light-system/tree/main/firmware/common/libraries/PowerMonitor
+ *            *
+ ****************************************************************************************************************************************/
 
 #ifndef POWERMONITOR_H
 #define POWERMONITOR_H
@@ -60,4 +63,4 @@ void PM_invertLogic(bool invert);
  */
 void PM_setDebounce(uint16_t ms);
 
-#endif 
+#endif

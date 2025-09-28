@@ -1,14 +1,63 @@
 {
-  "editor.formatOnSave": true,
-  "editor.defaultFormatter": "trunk.io",
+  // ============================================================
+  // VSCODE SETTINGS — CONSISTENT FORMATTING ACROSS LANGUAGES
+  // ============================================================
+
+  // --- GLOBAL FORMATTER BEHAVIOR ---
+  "editor.formatOnSave": true, // AUTO-FORMAT ON SAVE
+  "editor.formatOnSaveMode": "file", // FORMAT ENTIRE FILE ON SAVE
+  "editor.defaultFormatter": "esbenp.prettier-vscode", // DEFAULT FORMATTER = PRETTIER
+
+  // --- TRUNK (OPTIONAL, WINDOWS SUPPORT) ---
   "trunk.enableWindows": true,
-  "files.insertFinalNewline": false,
-  "files.trimFinalNewlines": false,
-  "cmake.configureOnOpen": false,
-  "[cpp]": {
-    "editor.defaultFormatter": "trunk.io"
+
+  // --- FILE HANDLING ---
+  "files.insertFinalNewline": false, // DO NOT ENFORCE TRAILING NEWLINE
+  "files.trimFinalNewlines": false, // KEEP EXTRA EMPTY LINES AT END
+  "cmake.configureOnOpen": false, // DISABLE AUTO-CONFIGURE ON CMAKE OPEN
+
+  // --- FILE ASSOCIATIONS ---
+  "files.associations": {
+    "**/alpine.Dockerfile": "dockerfile", // FORCE NON-STANDARD DOCKERFILE
+    "**/*Dockerfile*": "dockerfile" // MATCH ALL FILES NAMED LIKE DOCKERFILE
   },
-  "[powershell]": {
-    "editor.defaultFormatter": "ms-vscode.powershell"
-  }
+
+  // --- LANGUAGE-SPECIFIC FORMATTERS ---
+  "[cpp]": {
+    "editor.defaultFormatter": "xaver.clang-format" // USE CLANG-FORMAT FOR C++
+  },
+  "[c]": {
+    "editor.defaultFormatter": "xaver.clang-format" // USE CLANG-FORMAT FOR C
+  },
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter" // USE BLACK FOR PYTHON
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode" // USE PRETTIER FOR JSON
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode" // USE PRETTIER FOR JSONC
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode" // USE PRETTIER FOR YAML
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode" // USE PRETTIER FOR MARKDOWN
+  },
+  "[shellscript]": {
+    "editor.defaultFormatter": "foxundermoon.shell-format" // USE SHELL-FORMAT FOR BASH/SH
+  },
+
+  // --- PRETTIER CONFIG (JSON / YAML / MARKDOWN / ETC) ---
+  "prettier.printWidth": 100, // MAX LINE LENGTH = 100
+  "prettier.tabWidth": 2, // INDENT = 2 SPACES
+  "prettier.useTabs": false, // NO TABS
+  "prettier.trailingComma": "es5", // TRAILING COMMA WHERE POSSIBLE
+
+  // --- BLACK CONFIG (PYTHON) ---
+  "black-formatter.args": ["--line-length", "100"],
+
+  // --- CLANG-FORMAT CONFIG ---
+  "clang-format.style": "file", // READ STYLE FROM .CLANG-FORMAT
+  "clang-format.fallbackStyle": "Google" // FALLBACK TO GOOGLE STYLE
 }

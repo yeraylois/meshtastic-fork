@@ -1,10 +1,26 @@
 {
-    // See http://go.microsoft.com/fwlink/?LinkId=827846
-    // for the documentation about the extensions.json format
-    "recommendations": [
-        "platformio.platformio-ide"
-    ],
-    "unwantedRecommendations": [
-        "ms-vscode.cpptools-extension-pack"
-    ]
+  // ============================================================
+  // VSCODE EXTENSIONS RECOMMENDATIONS (PROJECT-LEVEL)
+  // ============================================================
+  // SEE: http://go.microsoft.com/fwlink/?LinkId=827846
+  // FORMAT: "recommendations" FOR REQUIRED EXTENSIONS,
+  //         "unwantedRecommendations" TO AVOID CONFLICTING ONES
+
+  "recommendations": [
+    "EditorConfig.EditorConfig", // ENSURE CONSISTENT EDITOR SETTINGS
+    "esbenp.prettier-vscode", // FORMATTER FOR JSON / YAML / MARKDOWN
+    "foxundermoon.shell-format", // FORMATTER FOR BASH / SHELL SCRIPTS
+    "ms-azuretools.vscode-docker", // DOCKERFILE & DOCKER SUPPORT
+    "ms-python.black-formatter", // PYTHON FORMATTER (BLACK)
+    "ms-python.python", // PYTHON LANGUAGE SUPPORT
+    "platformio.platformio-ide", // PLATFORMIO IDE (EMBEDDED DEV)
+    "redhat.vscode-yaml", // YAML VALIDATION AND SCHEMAS
+    "trunk.io", // TRUNK TOOLING INTEGRATION
+    "xaver.clang-format", // C / C++ FORMATTER (CLANG-FORMAT)
+    "zxh404.vscode-proto3" // PROTOBUF V3 FORMATTER
+  ],
+
+  "unwantedRecommendations": [
+    "ms-vscode.cpptools-extension-pack" // AVOID REDUNDANT / HEAVY C++ PACK
+  ]
 }

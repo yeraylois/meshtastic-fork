@@ -1,48 +1,53 @@
-/**************************************************************
- *   Project : Blackout Traffic Light System                  *
- *   Module  : Traffic Light Mesh Coordinator (Leader+Follower)
- *   Author  : Yeray Lois Sanchez                             *
- *   Email   : yerayloissanchez@gmail.com                     *
- **************************************************************/
+/****************************************************************
+ *   Project : Blackout Traffic Light System                    *
+ *   Module  : Traffic Light Mesh Coordinator (Leader+Follower) *
+ *   Author  : Yeray Lois Sanchez                               *
+ *   Email   : yerayloissanchez@gmail.com                       *
+ ****************************************************************/
 
 #include "TrafficLightMeshModule.h"
-#include "configuration.h"
+
 #include "mesh/MeshService.h"
 #include "mesh/generated/meshtastic/mesh.pb.h"
+
 #include "Channels.h"
+#include "configuration.h"
 
 #if !defined(LOG_TAG)
-#  define LOG_TAG "TrafficMesh"
+  #define LOG_TAG "TrafficMesh"
 #endif
 
 /* ===============================[ MESHTASTIC EXTERNS ]========================= */
-extern MeshService *service;
-extern Channels channels;
+extern MeshService* service;
+extern Channels     channels;
 /* ============================================================================== */
 
 /* ===============================[ PRIORITY TABLE DEFINITION ]========================== */
-const uint8_t TrafficLightMeshModule::kPrio_[SEM_MESH_NUM_KNOWN_NODES] = {
-  SEM_MESH_PRIO0
+const uint8_t TrafficLightMeshModule::kPrio_[SEM_MESH_NUM_KNOWN_NODES] = {SEM_MESH_PRIO0
 #if (SEM_MESH_NUM_KNOWN_NODES > 1)
- ,SEM_MESH_PRIO1
+                                                                          ,
+                                                                          SEM_MESH_PRIO1
 #endif
 #if (SEM_MESH_NUM_KNOWN_NODES > 2)
- ,SEM_MESH_PRIO2
+                                                                          ,
+                                                                          SEM_MESH_PRIO2
 #endif
 };
 
 /* ===================================[ CASE & TOPOLOGY ]================================ */
-inline uint8_t TrafficLightMeshModule::greenNode_(uint8_t c)
-{
-  if (c == 1) return 1;
-  if (c == 2) return 0;
+inline uint8_t TrafficLightMeshModule::greenNode_(uint8_t c) {
+  if (c == 1)
+    return 1;
+  if (c == 2)
+    return 0;
   return 2;
 }
-inline uint8_t TrafficLightMeshModule::nextCaseForTopology_(uint8_t curr)
-{
+inline uint8_t TrafficLightMeshModule::nextCaseForTopology_(uint8_t curr) {
 #if (SEM_MESH_TOPOLOGY >= 3)
-  if (curr == 2) return 3;
-  if (curr == 3) return 1;
+  if (curr == 2)
+    return 3;
+  if (curr == 3)
+    return 1;
   return 2;
 #else
   return (curr == 2) ? 3 : 2;
@@ -51,102 +56,136 @@ inline uint8_t TrafficLightMeshModule::nextCaseForTopology_(uint8_t curr)
 
 /* =====================================[ CTOR ]========================================= */
 TrafficLightMeshModule::TrafficLightMeshModule()
-  : SinglePortModule("traffic_light_mesh", kPort)
-  , concurrency::OSThread("TrafficLightMesh")
-{
-}
+    : SinglePortModule("traffic_light_mesh", kPort), concurrency::OSThread("TrafficLightMesh") {}
 
 /* ===================================[ STATUS LEDS ]==================================== */
-inline bool TrafficLightMeshModule::ledsPresent()
-{
+inline bool TrafficLightMeshModule::ledsPresent() {
   return (SEM_MESH_LED_RED_PIN >= 0 && SEM_MESH_LED_AMBER_PIN >= 0 && SEM_MESH_LED_GREEN_PIN >= 0);
 }
-inline void TrafficLightMeshModule::leds(bool r, bool a, bool g)
-{
-  if (SEM_MESH_LED_RED_PIN   >= 0)   digitalWrite(SEM_MESH_LED_RED_PIN,   r ? HIGH : LOW);
-  if (SEM_MESH_LED_AMBER_PIN >= 0)   digitalWrite(SEM_MESH_LED_AMBER_PIN, a ? HIGH : LOW);
-  if (SEM_MESH_LED_GREEN_PIN >= 0)   digitalWrite(SEM_MESH_LED_GREEN_PIN, g ? HIGH : LOW);
+inline void TrafficLightMeshModule::leds(bool r, bool a, bool g) {
+  if (SEM_MESH_LED_RED_PIN >= 0)
+    digitalWrite(SEM_MESH_LED_RED_PIN, r ? HIGH : LOW);
+  if (SEM_MESH_LED_AMBER_PIN >= 0)
+    digitalWrite(SEM_MESH_LED_AMBER_PIN, a ? HIGH : LOW);
+  if (SEM_MESH_LED_GREEN_PIN >= 0)
+    digitalWrite(SEM_MESH_LED_GREEN_PIN, g ? HIGH : LOW);
 }
 
 /* ===================================[ XOR (CSV CS) ]=================================== */
-uint8_t TrafficLightMeshModule::computeXOR(const uint8_t* data, size_t len)
-{
+uint8_t TrafficLightMeshModule::computeXOR(const uint8_t* data, size_t len) {
   uint8_t cs = 0;
-  while (len--) cs ^= *data++;
+  while (len--)
+    cs ^= *data++;
   return cs;
 }
 
 /* ===================================[ SIGNAL SETUP ]=================================== */
-void TrafficLightMeshModule::setupSignals_()
-{
+void TrafficLightMeshModule::setupSignals_() {
   /* VEHICLE HEAD PINMAPS */
-  vR_[VM_S2N] = SEM_MESH_V_S2N_R_PIN; vA_[VM_S2N] = SEM_MESH_V_S2N_A_PIN; vG_[VM_S2N] = SEM_MESH_V_S2N_G_PIN;
-  vR_[VM_S2W] = SEM_MESH_V_S2W_R_PIN; vA_[VM_S2W] = SEM_MESH_V_S2W_A_PIN; vG_[VM_S2W] = SEM_MESH_V_S2W_G_PIN;
-  vR_[VM_N2S] = SEM_MESH_V_N2S_R_PIN; vA_[VM_N2S] = SEM_MESH_V_N2S_A_PIN; vG_[VM_N2S] = SEM_MESH_V_N2S_G_PIN;
-  vR_[VM_N2W] = SEM_MESH_V_N2W_R_PIN; vA_[VM_N2W] = SEM_MESH_V_N2W_A_PIN; vG_[VM_N2W] = SEM_MESH_V_N2W_G_PIN;
-  vR_[VM_W2N] = SEM_MESH_V_W2N_R_PIN; vA_[VM_W2N] = SEM_MESH_V_W2N_A_PIN; vG_[VM_W2N] = SEM_MESH_V_W2N_G_PIN;
-  vR_[VM_W2S] = SEM_MESH_V_W2S_R_PIN; vA_[VM_W2S] = SEM_MESH_V_W2S_A_PIN; vG_[VM_W2S] = SEM_MESH_V_W2S_G_PIN;
+  vR_[VM_S2N] = SEM_MESH_V_S2N_R_PIN;
+  vA_[VM_S2N] = SEM_MESH_V_S2N_A_PIN;
+  vG_[VM_S2N] = SEM_MESH_V_S2N_G_PIN;
+  vR_[VM_S2W] = SEM_MESH_V_S2W_R_PIN;
+  vA_[VM_S2W] = SEM_MESH_V_S2W_A_PIN;
+  vG_[VM_S2W] = SEM_MESH_V_S2W_G_PIN;
+  vR_[VM_N2S] = SEM_MESH_V_N2S_R_PIN;
+  vA_[VM_N2S] = SEM_MESH_V_N2S_A_PIN;
+  vG_[VM_N2S] = SEM_MESH_V_N2S_G_PIN;
+  vR_[VM_N2W] = SEM_MESH_V_N2W_R_PIN;
+  vA_[VM_N2W] = SEM_MESH_V_N2W_A_PIN;
+  vG_[VM_N2W] = SEM_MESH_V_N2W_G_PIN;
+  vR_[VM_W2N] = SEM_MESH_V_W2N_R_PIN;
+  vA_[VM_W2N] = SEM_MESH_V_W2N_A_PIN;
+  vG_[VM_W2N] = SEM_MESH_V_W2N_G_PIN;
+  vR_[VM_W2S] = SEM_MESH_V_W2S_R_PIN;
+  vA_[VM_W2S] = SEM_MESH_V_W2S_A_PIN;
+  vG_[VM_W2S] = SEM_MESH_V_W2S_G_PIN;
 
   /* PEDESTRIAN PINMAPS */
-  pR_[PX_N1] = SEM_MESH_P_N1_R_PIN; pG_[PX_N1] = SEM_MESH_P_N1_G_PIN;
-  pR_[PX_S1] = SEM_MESH_P_S1_R_PIN; pG_[PX_S1] = SEM_MESH_P_S1_G_PIN;
-  pR_[PX_W2] = SEM_MESH_P_W2_R_PIN; pG_[PX_W2] = SEM_MESH_P_W2_G_PIN;
-  pR_[PX_S2] = SEM_MESH_P_S2_R_PIN; pG_[PX_S2] = SEM_MESH_P_S2_G_PIN;
-  pR_[PX_N2] = SEM_MESH_P_N2_R_PIN; pG_[PX_N2] = SEM_MESH_P_N2_G_PIN;
-  pR_[PX_W1] = SEM_MESH_P_W1_R_PIN; pG_[PX_W1] = SEM_MESH_P_W1_G_PIN;
+  pR_[PX_N1] = SEM_MESH_P_N1_R_PIN;
+  pG_[PX_N1] = SEM_MESH_P_N1_G_PIN;
+  pR_[PX_S1] = SEM_MESH_P_S1_R_PIN;
+  pG_[PX_S1] = SEM_MESH_P_S1_G_PIN;
+  pR_[PX_W2] = SEM_MESH_P_W2_R_PIN;
+  pG_[PX_W2] = SEM_MESH_P_W2_G_PIN;
+  pR_[PX_S2] = SEM_MESH_P_S2_R_PIN;
+  pG_[PX_S2] = SEM_MESH_P_S2_G_PIN;
+  pR_[PX_N2] = SEM_MESH_P_N2_R_PIN;
+  pG_[PX_N2] = SEM_MESH_P_N2_G_PIN;
+  pR_[PX_W1] = SEM_MESH_P_W1_R_PIN;
+  pG_[PX_W1] = SEM_MESH_P_W1_G_PIN;
 
   /* PINMODES + DEFAULTS */
   for (uint8_t i = 0; i < VM_COUNT; ++i) {
-    if (vR_[i] >= 0) pinMode(vR_[i], OUTPUT);
-    if (vA_[i] >= 0) pinMode(vA_[i], OUTPUT);
-    if (vG_[i] >= 0) pinMode(vG_[i], OUTPUT);
+    if (vR_[i] >= 0)
+      pinMode(vR_[i], OUTPUT);
+    if (vA_[i] >= 0)
+      pinMode(vA_[i], OUTPUT);
+    if (vG_[i] >= 0)
+      pinMode(vG_[i], OUTPUT);
     vState_[i] = L_RED;
   }
   for (uint8_t i = 0; i < PX_COUNT; ++i) {
-    if (pR_[i] >= 0) pinMode(pR_[i], OUTPUT);
-    if (pG_[i] >= 0) pinMode(pG_[i], OUTPUT);
+    if (pR_[i] >= 0)
+      pinMode(pR_[i], OUTPUT);
+    if (pG_[i] >= 0)
+      pinMode(pG_[i], OUTPUT);
     pGreen_[i] = false;
   }
 
   /* FORCE ALL-RED INIT */
-  for (uint8_t i = 0; i < VM_COUNT; ++i) setVehPins_(i, true, false, false);
-  for (uint8_t i = 0; i < PX_COUNT; ++i) setPedPins_(i, false);
+  for (uint8_t i = 0; i < VM_COUNT; ++i)
+    setVehPins_(i, true, false, false);
+  for (uint8_t i = 0; i < PX_COUNT; ++i)
+    setPedPins_(i, false);
 }
 
 /* ===================================[ APPLY HELPERS ]================================== */
-inline void TrafficLightMeshModule::setVehPins_(uint8_t idx, bool r, bool a, bool g)
-{
-  if (vR_[idx] >= 0) digitalWrite(vR_[idx], r ? HIGH : LOW);
-  if (vA_[idx] >= 0) digitalWrite(vA_[idx], a ? HIGH : LOW);
-  if (vG_[idx] >= 0) digitalWrite(vG_[idx], g ? HIGH : LOW);
+inline void TrafficLightMeshModule::setVehPins_(uint8_t idx, bool r, bool a, bool g) {
+  if (vR_[idx] >= 0)
+    digitalWrite(vR_[idx], r ? HIGH : LOW);
+  if (vA_[idx] >= 0)
+    digitalWrite(vA_[idx], a ? HIGH : LOW);
+  if (vG_[idx] >= 0)
+    digitalWrite(vG_[idx], g ? HIGH : LOW);
 }
-inline void TrafficLightMeshModule::setPedPins_(uint8_t idx, bool g)
-{
-  if (pG_[idx] >= 0) digitalWrite(pG_[idx], g ? HIGH : LOW);
-  if (pR_[idx] >= 0) digitalWrite(pR_[idx], g ? LOW  : HIGH);
+inline void TrafficLightMeshModule::setPedPins_(uint8_t idx, bool g) {
+  if (pG_[idx] >= 0)
+    digitalWrite(pG_[idx], g ? HIGH : LOW);
+  if (pR_[idx] >= 0)
+    digitalWrite(pR_[idx], g ? LOW : HIGH);
 }
-void TrafficLightMeshModule::driveOutputs_()
-{
+void TrafficLightMeshModule::driveOutputs_() {
   const bool blink = ((millis() / SEM_MESH_AMBER_BLINK_MS) & 1) != 0;
 
   /* VEHICLE STATES */
   for (uint8_t i = 0; i < VM_COUNT; ++i) {
     switch (vState_[i]) {
-      case L_RED:          setVehPins_(i, true,  false, false); break;
-      case L_GREEN:        setVehPins_(i, false, false, true ); break;
-      case L_AMBER_FIXED:  setVehPins_(i, false, true,  false); break;
-      case L_AMBER_FLASH:  setVehPins_(i, false, blink, false); break;
+      case L_RED:
+        setVehPins_(i, true, false, false);
+        break;
+      case L_GREEN:
+        setVehPins_(i, false, false, true);
+        break;
+      case L_AMBER_FIXED:
+        setVehPins_(i, false, true, false);
+        break;
+      case L_AMBER_FLASH:
+        setVehPins_(i, false, blink, false);
+        break;
     }
   }
   /* PEDESTRIAN STATES */
-  for (uint8_t i = 0; i < PX_COUNT; ++i) setPedPins_(i, pGreen_[i]);
+  for (uint8_t i = 0; i < PX_COUNT; ++i)
+    setPedPins_(i, pGreen_[i]);
 }
 
 /* ===============================[ INTERSECTION CASE TABLE ]============================= */
-void TrafficLightMeshModule::applyIntersectionCase_(uint8_t c)
-{
-  for (uint8_t i = 0; i < VM_COUNT; ++i) vState_[i] = L_RED;
-  for (uint8_t i = 0; i < PX_COUNT; ++i) pGreen_[i] = false;
+void TrafficLightMeshModule::applyIntersectionCase_(uint8_t c) {
+  for (uint8_t i = 0; i < VM_COUNT; ++i)
+    vState_[i] = L_RED;
+  for (uint8_t i = 0; i < PX_COUNT; ++i)
+    pGreen_[i] = false;
 
   switch (c) {
     case 1:
@@ -194,38 +233,49 @@ void TrafficLightMeshModule::applyIntersectionCase_(uint8_t c)
 }
 
 /* ---------------------- AMBER TRANSITION & ALL-RED CLEARANCE ---------------------- */
-void TrafficLightMeshModule::applyAllRed_()
-{
-  for (uint8_t i = 0; i < VM_COUNT; ++i) vState_[i] = L_RED;
-  for (uint8_t i = 0; i < PX_COUNT; ++i) pGreen_[i] = false;
+void TrafficLightMeshModule::applyAllRed_() {
+  for (uint8_t i = 0; i < VM_COUNT; ++i)
+    vState_[i] = L_RED;
+  for (uint8_t i = 0; i < PX_COUNT; ++i)
+    pGreen_[i] = false;
   driveOutputs_();
 }
 
-void TrafficLightMeshModule::applyAmberTransitionForIntersection_()
-{
-  for (uint8_t i = 0; i < VM_COUNT; ++i) vState_[i] = L_RED;
-  for (uint8_t i = 0; i < PX_COUNT; ++i) pGreen_[i] = false;
+void TrafficLightMeshModule::applyAmberTransitionForIntersection_() {
+  for (uint8_t i = 0; i < VM_COUNT; ++i)
+    vState_[i] = L_RED;
+  for (uint8_t i = 0; i < PX_COUNT; ++i)
+    pGreen_[i] = false;
 
   /* SET AMBER ON THE MOVEMENTS THAT WERE GREEN IN THE CURRENT CASE */
   switch (caseIndex_) {
-    case 1: vState_[VM_S2N] = L_AMBER_FIXED; vState_[VM_S2W] = L_AMBER_FIXED; break;
-    case 2: vState_[VM_N2S] = L_AMBER_FIXED; vState_[VM_N2W] = L_AMBER_FIXED; break;
-    default: vState_[VM_W2N] = L_AMBER_FIXED; vState_[VM_W2S] = L_AMBER_FIXED; break;
+    case 1:
+      vState_[VM_S2N] = L_AMBER_FIXED;
+      vState_[VM_S2W] = L_AMBER_FIXED;
+      break;
+    case 2:
+      vState_[VM_N2S] = L_AMBER_FIXED;
+      vState_[VM_N2W] = L_AMBER_FIXED;
+      break;
+    default:
+      vState_[VM_W2N] = L_AMBER_FIXED;
+      vState_[VM_W2S] = L_AMBER_FIXED;
+      break;
   }
   driveOutputs_();
 }
 
 /* ===================================[ INIT ONCE ]====================================== */
-void TrafficLightMeshModule::initOnce()
-{
-  if (ready_) return;
+void TrafficLightMeshModule::initOnce() {
+  if (ready_)
+    return;
 
   /* OPTIONAL STATUS LEDS */
   if (ledsPresent()) {
-    pinMode(SEM_MESH_LED_RED_PIN,   OUTPUT);
+    pinMode(SEM_MESH_LED_RED_PIN, OUTPUT);
     pinMode(SEM_MESH_LED_AMBER_PIN, OUTPUT);
     pinMode(SEM_MESH_LED_GREEN_PIN, OUTPUT);
-    leds(true, false, false);  /* SAFE START -> RED */
+    leds(true, false, false); /* SAFE START -> RED */
   }
 
   /* SIGNAL ARRAYS */
@@ -253,12 +303,12 @@ void TrafficLightMeshModule::initOnce()
     seenLeaseExpiryMs_ = 0;
 
     /* START IN SAFETY */
-    inSafety_          = true;
+    inSafety_ = true;
     scheduleElectionBackoff_();
 
     /** STARTUP LOWER-ID OBSERVER */
-    seenLowerId_             = false;
-    startupLowerDeadlineMs_  = millis() + SEM_MESH_STARTUP_WAIT_LOWER_MS;
+    seenLowerId_            = false;
+    startupLowerDeadlineMs_ = millis() + SEM_MESH_STARTUP_WAIT_LOWER_MS;
 
     LOG_WARN("safety_enter (startup)\n");
   }
@@ -269,140 +319,162 @@ void TrafficLightMeshModule::initOnce()
   ready_ = true;
 
   LOG_INFO("INIT(mesh): id=%u role=%s topo=%u\n",
-           (unsigned)myId_, isLeader_ ? "LEADER" : "FOLLOWER",
-           (unsigned)SEM_MESH_TOPOLOGY);
+           (unsigned) myId_,
+           isLeader_ ? "LEADER" : "FOLLOWER",
+           (unsigned) SEM_MESH_TOPOLOGY);
 }
 
 /* ===================================[ MESH TX ]======================================== */
-void TrafficLightMeshModule::sendPayload_(const char* buf, size_t len)
-{
-  meshtastic_MeshPacket *pkt = (meshtastic_MeshPacket *)calloc(1, sizeof(*pkt));
+void TrafficLightMeshModule::sendPayload_(const char* buf, size_t len) {
+  meshtastic_MeshPacket* pkt = (meshtastic_MeshPacket*) calloc(1, sizeof(*pkt));
   if (!pkt) {
     LOG_ERROR("sendPayload_: OOM\n");
     return;
   }
-  pkt->to         = NODENUM_BROADCAST;
-  pkt->channel    = channels.getPrimaryIndex();
-  pkt->want_ack   = false;
-  pkt->hop_start  = 0;
-  pkt->hop_limit  = 0;
+  pkt->to        = NODENUM_BROADCAST;
+  pkt->channel   = channels.getPrimaryIndex();
+  pkt->want_ack  = false;
+  pkt->hop_start = 0;
+  pkt->hop_limit = 0;
 
   pkt->which_payload_variant = meshtastic_MeshPacket_decoded_tag;
   pkt->decoded.portnum       = kPort;
   pkt->decoded.want_response = false;
 
-  const size_t n = (len < sizeof(pkt->decoded.payload.bytes))
-                 ? len : sizeof(pkt->decoded.payload.bytes);
+  const size_t n =
+      (len < sizeof(pkt->decoded.payload.bytes)) ? len : sizeof(pkt->decoded.payload.bytes);
   pkt->decoded.payload.size = n;
   memcpy(pkt->decoded.payload.bytes, buf, n);
 
   service->sendToMesh(pkt);
 }
-void TrafficLightMeshModule::sendBeacon_()
-{
-  const uint32_t now = millis();
-  const uint32_t elapsed = (!inAmber_ && !inAllRed_) ? (now - tCaseStart_)
-                          : ( inAmber_               ? (now - tAmberStart_)
-                                                   : (now - tAllRedStart_) );
+void TrafficLightMeshModule::sendBeacon_() {
+  const uint32_t now     = millis();
+  const uint32_t elapsed = (!inAmber_ && !inAllRed_)
+                               ? (now - tCaseStart_)
+                               : (inAmber_ ? (now - tAmberStart_) : (now - tAllRedStart_));
   const uint32_t leaseTt = (leaseExpiryMs_ > now) ? (leaseExpiryMs_ - now) : 0;
   const uint8_t  amField = inAllRed_ ? 2 : (inAmber_ ? 1 : 0);
 
   tx_Beacon_(myId_, seq_, caseIndex_, amField, offNode_, leaseTt, elapsed);
   seq_++;
 }
-void TrafficLightMeshModule::tx_Beacon_(uint8_t leaderId, uint32_t seq, uint8_t c, uint8_t am, uint8_t off,
-                                        uint32_t leaseTtlMs, uint32_t elapsedMs)
-{
+void TrafficLightMeshModule::tx_Beacon_(uint8_t  leaderId,
+                                        uint32_t seq,
+                                        uint8_t  c,
+                                        uint8_t  am,
+                                        uint8_t  off,
+                                        uint32_t leaseTtlMs,
+                                        uint32_t elapsedMs) {
   char p[96];
-  int L = snprintf(p, sizeof(p), "B,%u,%lu,%u,%u,%u,%lu,%lu",
-                   (unsigned)leaderId, (unsigned long)seq,
-                   (unsigned)c, (unsigned)am, (unsigned)off,
-                   (unsigned long)leaseTtlMs, (unsigned long)elapsedMs);
-  if (L < 0) return;
-  uint8_t cs = computeXOR(reinterpret_cast<const uint8_t*>(p), (size_t)L);
+  int  L = snprintf(p,
+                   sizeof(p),
+                   "B,%u,%lu,%u,%u,%u,%lu,%lu",
+                   (unsigned) leaderId,
+                   (unsigned long) seq,
+                   (unsigned) c,
+                   (unsigned) am,
+                   (unsigned) off,
+                   (unsigned long) leaseTtlMs,
+                   (unsigned long) elapsedMs);
+  if (L < 0)
+    return;
+  uint8_t cs = computeXOR(reinterpret_cast<const uint8_t*>(p), (size_t) L);
 
   char f[112];
-  int F = snprintf(f, sizeof(f), "%s*%02X\n", p, cs);
-  if (F > 0) sendPayload_(f, (size_t)F);
+  int  F = snprintf(f, sizeof(f), "%s*%02X\n", p, cs);
+  if (F > 0)
+    sendPayload_(f, (size_t) F);
 
   LOG_DEBUG("beacon_tx(mesh): %s\n", p);
 }
-void TrafficLightMeshModule::tx_Claim_(uint8_t id, uint8_t rank)
-{
+void TrafficLightMeshModule::tx_Claim_(uint8_t id, uint8_t rank) {
   char p[32];
-  int L = snprintf(p, sizeof(p), "C,%u,%u", (unsigned)id, (unsigned)rank);
-  if (L < 0) return;
-  uint8_t cs = computeXOR(reinterpret_cast<const uint8_t*>(p), (size_t)L);
+  int  L = snprintf(p, sizeof(p), "C,%u,%u", (unsigned) id, (unsigned) rank);
+  if (L < 0)
+    return;
+  uint8_t cs = computeXOR(reinterpret_cast<const uint8_t*>(p), (size_t) L);
 
   char f[48];
-  int F = snprintf(f, sizeof(f), "%s*%02X\n", p, cs);
-  if (F > 0) sendPayload_(f, (size_t)F);
+  int  F = snprintf(f, sizeof(f), "%s*%02X\n", p, cs);
+  if (F > 0)
+    sendPayload_(f, (size_t) F);
 }
-void TrafficLightMeshModule::tx_Yield_(uint8_t fromId, uint8_t toId)
-{
+void TrafficLightMeshModule::tx_Yield_(uint8_t fromId, uint8_t toId) {
   char p[32];
-  int L = snprintf(p, sizeof(p), "Y,%u,%u", (unsigned)fromId, (unsigned)toId);
-  if (L < 0) return;
-  uint8_t cs = computeXOR(reinterpret_cast<const uint8_t*>(p), (size_t)L);
+  int  L = snprintf(p, sizeof(p), "Y,%u,%u", (unsigned) fromId, (unsigned) toId);
+  if (L < 0)
+    return;
+  uint8_t cs = computeXOR(reinterpret_cast<const uint8_t*>(p), (size_t) L);
 
   char f[48];
-  int F = snprintf(f, sizeof(f), "%s*%02X\n", p, cs);
-  if (F > 0) sendPayload_(f, (size_t)F);
+  int  F = snprintf(f, sizeof(f), "%s*%02X\n", p, cs);
+  if (F > 0)
+    sendPayload_(f, (size_t) F);
 }
 
 /* ===================================[ CSV UTILS ]====================================== */
-bool TrafficLightMeshModule::parseCSV_u8(const char*& p, uint8_t& out)
-{
-  char* end = nullptr;
-  unsigned long v = strtoul(p, &end, 10);
-  if (end == p) return false;
-  out = (uint8_t)v;
-  p = (*end == ',') ? end + 1 : end;
+bool TrafficLightMeshModule::parseCSV_u8(const char*& p, uint8_t& out) {
+  char*         end = nullptr;
+  unsigned long v   = strtoul(p, &end, 10);
+  if (end == p)
+    return false;
+  out = (uint8_t) v;
+  p   = (*end == ',') ? end + 1 : end;
   return true;
 }
-bool TrafficLightMeshModule::parseCSV_u16(const char*& p, uint16_t& out)
-{
-  char* end = nullptr;
-  unsigned long v = strtoul(p, &end, 10);
-  if (end == p) return false;
-  out = (uint16_t)v;
-  p = (*end == ',') ? end + 1 : end;
+bool TrafficLightMeshModule::parseCSV_u16(const char*& p, uint16_t& out) {
+  char*         end = nullptr;
+  unsigned long v   = strtoul(p, &end, 10);
+  if (end == p)
+    return false;
+  out = (uint16_t) v;
+  p   = (*end == ',') ? end + 1 : end;
   return true;
 }
-bool TrafficLightMeshModule::parseCSV_u32(const char*& p, uint32_t& out)
-{
-  char* end = nullptr;
-  unsigned long v = strtoul(p, &end, 10);
-  if (end == p) return false;
-  out = (uint32_t)v;
-  p = (*end == ',') ? end + 1 : end;
+bool TrafficLightMeshModule::parseCSV_u32(const char*& p, uint32_t& out) {
+  char*         end = nullptr;
+  unsigned long v   = strtoul(p, &end, 10);
+  if (end == p)
+    return false;
+  out = (uint32_t) v;
+  p   = (*end == ',') ? end + 1 : end;
   return true;
 }
 
 /* ===================================[ PROTOCOL RX ]==================================== */
-void TrafficLightMeshModule::handleLine_(const char* lineZ)
-{
+void TrafficLightMeshModule::handleLine_(const char* lineZ) {
   const char* star = strchr(lineZ, '*');
-  if (!star) return;
+  if (!star)
+    return;
 
-  const size_t payLen = (size_t)(star - lineZ);
-  uint8_t csRx = (uint8_t)strtoul(star + 1, nullptr, 16);
-  if (computeXOR(reinterpret_cast<const uint8_t*>(lineZ), payLen) != csRx) return;
+  const size_t payLen = (size_t) (star - lineZ);
+  uint8_t      csRx   = (uint8_t) strtoul(star + 1, nullptr, 16);
+  if (computeXOR(reinterpret_cast<const uint8_t*>(lineZ), payLen) != csRx)
+    return;
 
-  if (lineZ[1] != ',') return;
-  const char type = lineZ[0];
-  const char* p   = lineZ + 2;
+  if (lineZ[1] != ',')
+    return;
+  const char  type = lineZ[0];
+  const char* p    = lineZ + 2;
 
   if (type == 'B') {
-    uint8_t lid = 0, c = 2, am = 0, off = 0;
+    uint8_t  lid = 0, c = 2, am = 0, off = 0;
     uint32_t seq = 0, lt = 0, pe = 0;
-    if (!parseCSV_u8(p, lid)) return;
-    if (!parseCSV_u32(p, seq)) return;
-    if (!parseCSV_u8(p, c))   return;
-    if (!parseCSV_u8(p, am))  return;
-    if (!parseCSV_u8(p, off)) return;
-    if (!parseCSV_u32(p, lt)) return;
-    if (!parseCSV_u32(p, pe)) return;
+    if (!parseCSV_u8(p, lid))
+      return;
+    if (!parseCSV_u32(p, seq))
+      return;
+    if (!parseCSV_u8(p, c))
+      return;
+    if (!parseCSV_u8(p, am))
+      return;
+    if (!parseCSV_u8(p, off))
+      return;
+    if (!parseCSV_u32(p, lt))
+      return;
+    if (!parseCSV_u32(p, pe))
+      return;
 
     const uint32_t now = millis();
     lastBeaconRxMs_    = now;
@@ -422,7 +494,8 @@ void TrafficLightMeshModule::handleLine_(const char* lineZ)
     observedLeaderRank_ = rSeen;
     if (claiming_) {
       const uint8_t rMe = idxInPrioList_(myId_);
-      if (rSeen < rMe) stopClaiming_(false);
+      if (rSeen < rMe)
+        stopClaiming_(false);
     }
 
     /* YIELD IF SEE HIGHER PRIORITY */
@@ -452,21 +525,29 @@ void TrafficLightMeshModule::handleLine_(const char* lineZ)
     }
 
     LOG_DEBUG("beacon_rx(mesh): L=%u seq=%lu c=%u am=%u off=%u lt=%lu pe=%lu\n",
-              (unsigned)lid, (unsigned long)seq, (unsigned)c, (unsigned)am,
-              (unsigned)off, (unsigned long)lt, (unsigned long)pe);
+              (unsigned) lid,
+              (unsigned long) seq,
+              (unsigned) c,
+              (unsigned) am,
+              (unsigned) off,
+              (unsigned long) lt,
+              (unsigned long) pe);
     return;
   }
 
   if (type == 'C') {
     uint8_t id = 0, rank = 0xFF;
-    if (!parseCSV_u8(p, id))   return;
-    if (!parseCSV_u8(p, rank)) return;
+    if (!parseCSV_u8(p, id))
+      return;
+    if (!parseCSV_u8(p, rank))
+      return;
 
     observeRemoteId_(id); /* LOWER-ID OBSERVER */
 
     if (claiming_) {
       const uint8_t rMe = idxInPrioList_(myId_);
-      if (rank < rMe) stopClaiming_(false);
+      if (rank < rMe)
+        stopClaiming_(false);
     }
 
     if (isLeader_ && id != myId_) {
@@ -485,7 +566,8 @@ void TrafficLightMeshModule::handleLine_(const char* lineZ)
 
   if (type == 'A') {
     uint8_t off = 0;
-    if (!parseCSV_u8(p, off)) return;
+    if (!parseCSV_u8(p, off))
+      return;
     if (!isLeader_) {
       inAmber_  = true;
       inAllRed_ = false;
@@ -498,7 +580,8 @@ void TrafficLightMeshModule::handleLine_(const char* lineZ)
 
   if (type == 'S') {
     uint8_t c = 2;
-    if (!parseCSV_u8(p, c)) return;
+    if (!parseCSV_u8(p, c))
+      return;
     if (!isLeader_) {
       inAmber_   = false;
       inAllRed_  = false;
@@ -510,35 +593,33 @@ void TrafficLightMeshModule::handleLine_(const char* lineZ)
 }
 
 /* ===================================[ ELECTION ]======================================= */
-uint8_t TrafficLightMeshModule::idxInPrioList_(uint8_t id) const
-{
+uint8_t TrafficLightMeshModule::idxInPrioList_(uint8_t id) const {
   for (uint8_t i = 0; i < SEM_MESH_NUM_KNOWN_NODES; ++i)
-    if (kPrio_[i] == id) return i;
+    if (kPrio_[i] == id)
+      return i;
   return 0xFE; /* NOT FOUND => VERY LOW PRIORITY */
 }
-void TrafficLightMeshModule::scheduleElectionBackoff_()
-{
-  const uint8_t r = idxInPrioList_(myId_);
-  const uint32_t jitter = (uint32_t)random(SEM_MESH_ELECT_JITTER_MS + 1);
-  electBackoffUntilMs_ = millis()
-                       + SEM_MESH_ELECT_BACKOFF_BASE_MS
-                       + (uint32_t)r * SEM_MESH_ELECT_BACKOFF_STEP_MS
-                       + jitter;
+void TrafficLightMeshModule::scheduleElectionBackoff_() {
+  const uint8_t  r      = idxInPrioList_(myId_);
+  const uint32_t jitter = (uint32_t) random(SEM_MESH_ELECT_JITTER_MS + 1);
+  electBackoffUntilMs_  = millis() + SEM_MESH_ELECT_BACKOFF_BASE_MS
+                         + (uint32_t) r * SEM_MESH_ELECT_BACKOFF_STEP_MS + jitter;
   observedLeaderRank_ = 0xFF;
   LOG_INFO("election: backoff until %lu ms (rank=%u)\n",
-           (unsigned long)electBackoffUntilMs_, (unsigned)r);
+           (unsigned long) electBackoffUntilMs_,
+           (unsigned) r);
 }
-void TrafficLightMeshModule::startClaiming_()
-{
-  if (claiming_) return;
-  claiming_ = true;
+void TrafficLightMeshModule::startClaiming_() {
+  if (claiming_)
+    return;
+  claiming_     = true;
   claimUntilMs_ = millis() + SEM_MESH_CLAIM_WINDOW_MS;
   tx_Claim_(myId_, idxInPrioList_(myId_));
-  LOG_INFO("election: CLAIM start (id=%u)\n", (unsigned)myId_);
+  LOG_INFO("election: CLAIM start (id=%u)\n", (unsigned) myId_);
 }
-void TrafficLightMeshModule::stopClaiming_(bool won)
-{
-  if (!claiming_) return;
+void TrafficLightMeshModule::stopClaiming_(bool won) {
+  if (!claiming_)
+    return;
   claiming_ = false;
   if (won) {
     becomeLeaderFromHere_();
@@ -546,50 +627,48 @@ void TrafficLightMeshModule::stopClaiming_(bool won)
     LOG_INFO("election: CLAIM aborted (lost)\n");
   }
 }
-void TrafficLightMeshModule::becomeLeaderFromHere_()
-{
+void TrafficLightMeshModule::becomeLeaderFromHere_() {
   isLeader_      = true;
   leaderId_      = myId_;
   leaseExpiryMs_ = millis() + SEM_MESH_LEASE_MS;
-  nextBeaconAt_  = 0;    /* SEND ASAP */
+  nextBeaconAt_  = 0; /* SEND ASAP */
   seq_           = 0;
 
-  if (inSafety_) inSafety_ = false;
+  if (inSafety_)
+    inSafety_ = false;
 
-  LOG_INFO("election: I AM THE LEADER NOW (id=%u)\n", (unsigned)myId_);
+  LOG_INFO("election: I AM THE LEADER NOW (id=%u)\n", (unsigned) myId_);
 }
-void TrafficLightMeshModule::yieldTo_(uint8_t newLeader)
-{
-  if (!isLeader_) return;
+void TrafficLightMeshModule::yieldTo_(uint8_t newLeader) {
+  if (!isLeader_)
+    return;
 
   tx_Yield_(myId_, newLeader);
 
-  isLeader_  = false;
-  leaderId_  = newLeader;
-  claiming_  = false;
-  inSafety_  = true;  /* WAIT UNTIL NEW BEACON ARRIVES */
-  LOG_INFO("handover: I yielded to leader id=%u\n", (unsigned)newLeader);
+  isLeader_ = false;
+  leaderId_ = newLeader;
+  claiming_ = false;
+  inSafety_ = true; /* WAIT UNTIL NEW BEACON ARRIVES */
+  LOG_INFO("handover: I yielded to leader id=%u\n", (unsigned) newLeader);
 }
-inline void TrafficLightMeshModule::observeRemoteId_(uint8_t remoteId)
-{
-  if (remoteId < myId_) seenLowerId_ = true;
+inline void TrafficLightMeshModule::observeRemoteId_(uint8_t remoteId) {
+  if (remoteId < myId_)
+    seenLowerId_ = true;
 }
 
 /* ===================================[ LEADER SIDE ]==================================== */
-void TrafficLightMeshModule::leaderTick_()
-{
+void TrafficLightMeshModule::leaderTick_() {
   const uint32_t now = millis();
 
   /* LEASE RENEWAL WITH MARGIN */
-  if ((int32_t)(leaseExpiryMs_ - now) <= (int32_t)SEM_MESH_RENEW_BEFORE_MS) {
+  if ((int32_t) (leaseExpiryMs_ - now) <= (int32_t) SEM_MESH_RENEW_BEFORE_MS) {
     leaseExpiryMs_ = now + SEM_MESH_LEASE_MS;
-    LOG_INFO("lease_renew -> expires_in=%lu ms\n",
-             (unsigned long)(leaseExpiryMs_ - now));
+    LOG_INFO("lease_renew -> expires_in=%lu ms\n", (unsigned long) (leaseExpiryMs_ - now));
   }
 
   /* SEQUENCE: STABLE -> AMBER -> ALL_RED -> NEXT CASE (SYNC BEACONS AT EACH EDGE) */
   if (!inAmber_ && !inAllRed_) {
-    if ((int32_t)(now - tCaseStart_) >= (int32_t)SEM_MESH_CASE_INTERVAL_MS) {
+    if ((int32_t) (now - tCaseStart_) >= (int32_t) SEM_MESH_CASE_INTERVAL_MS) {
       inAmber_     = true;
       tAmberStart_ = now;
       offNode_     = greenNode_(caseIndex_);
@@ -598,60 +677,56 @@ void TrafficLightMeshModule::leaderTick_()
       applyAmberTransitionForIntersection_(); /* REAL AMBER ON HEADS */
       applyAmberLocal(offNode_);              /* STATUS LED */
 
-      sendBeacon_();                          /* am=1 */
+      sendBeacon_(); /* am=1 */
       nextBeaconAt_ = now + SEM_MESH_BEACON_PERIOD_MS;
 
-      LOG_INFO("AMBER begin offNode=%u (from case=%u)\n",
-               (unsigned)offNode_, (unsigned)caseIndex_);
+      LOG_INFO(
+          "AMBER begin offNode=%u (from case=%u)\n", (unsigned) offNode_, (unsigned) caseIndex_);
     }
-  }
-  else if (inAmber_ && !inAllRed_) {
-    if ((int32_t)(now - tAmberStart_) >= (int32_t)SEM_MESH_AMBER_INTERVAL_MS) {
+  } else if (inAmber_ && !inAllRed_) {
+    if ((int32_t) (now - tAmberStart_) >= (int32_t) SEM_MESH_AMBER_INTERVAL_MS) {
       inAmber_      = false;
       inAllRed_     = true;
       tAllRedStart_ = now;
 
       applyAllRed_();
 
-      sendBeacon_();                          /* am=2 */
+      sendBeacon_(); /* am=2 */
       nextBeaconAt_ = now + SEM_MESH_BEACON_PERIOD_MS;
     }
-  }
-  else { /* inAllRed_ */
-    if ((int32_t)(now - tAllRedStart_) >= (int32_t)SEM_MESH_ALL_RED_MS) {
-      inAllRed_    = false;
-      caseIndex_   = nextCase_;
-      tCaseStart_  = now;
+  } else { /* inAllRed_ */
+    if ((int32_t) (now - tAllRedStart_) >= (int32_t) SEM_MESH_ALL_RED_MS) {
+      inAllRed_   = false;
+      caseIndex_  = nextCase_;
+      tCaseStart_ = now;
 
       applyCaseLocal(caseIndex_);
       applyIntersectionCase_(caseIndex_);
 
-      sendBeacon_();                          /* am=0, c=new */
+      sendBeacon_(); /* am=0, c=new */
       nextBeaconAt_ = now + SEM_MESH_BEACON_PERIOD_MS;
 
-      LOG_INFO("CASE apply %u\n", (unsigned)caseIndex_);
+      LOG_INFO("CASE apply %u\n", (unsigned) caseIndex_);
     }
   }
 
   /* PERIODIC BEACON (REDUNDANCY) */
-  if ((int32_t)(now - nextBeaconAt_) >= 0) {
+  if ((int32_t) (now - nextBeaconAt_) >= 0) {
     sendBeacon_();
     nextBeaconAt_ = now + SEM_MESH_BEACON_PERIOD_MS;
   }
 }
 
 /* ===================================[ FOLLOWER SIDE ]================================== */
-void TrafficLightMeshModule::followerTick_()
-{
+void TrafficLightMeshModule::followerTick_() {
   const uint32_t now = millis();
 
   /* BEACON LOSS -> SAFETY + ELECTION */
-  if (!inSafety_ && lastBeaconRxMs_ != 0 &&
-      (int32_t)(now - lastBeaconRxMs_) > (int32_t)SEM_MESH_LOSS_TIMEOUT_MS)
-  {
+  if (!inSafety_ && lastBeaconRxMs_ != 0
+      && (int32_t) (now - lastBeaconRxMs_) > (int32_t) SEM_MESH_LOSS_TIMEOUT_MS) {
     inSafety_ = true;
     scheduleElectionBackoff_();
-    LOG_WARN("safety_enter (no beacon > %u ms)\n", (unsigned)SEM_MESH_LOSS_TIMEOUT_MS);
+    LOG_WARN("safety_enter (no beacon > %u ms)\n", (unsigned) SEM_MESH_LOSS_TIMEOUT_MS);
   }
 
   if (inSafety_) {
@@ -660,9 +735,8 @@ void TrafficLightMeshModule::followerTick_()
     /** STARTUP LOWER-ID POLICY:
      * IF WE HAVE NOT HEARD ANY LOWER-ID NODE BY THE DEADLINE, START CLAIMING
      */
-    if (!claiming_ && startupLowerDeadlineMs_ != 0 &&
-        (int32_t)(now - startupLowerDeadlineMs_) >= 0)
-    {
+    if (!claiming_ && startupLowerDeadlineMs_ != 0
+        && (int32_t) (now - startupLowerDeadlineMs_) >= 0) {
       if (!seenLowerId_) {
         LOG_INFO("startup_lower_id: no lower-ID heard -> start claiming now\n");
         startClaiming_();
@@ -673,28 +747,28 @@ void TrafficLightMeshModule::followerTick_()
     }
 
     /* NORMAL BACKOFF WAIT */
-    if (electBackoffUntilMs_ && (int32_t)(now - electBackoffUntilMs_) < 0) {
+    if (electBackoffUntilMs_ && (int32_t) (now - electBackoffUntilMs_) < 0) {
       return;
     }
 
     /* START CLAIM IF STILL NO BEACON */
-    if (!claiming_ && (electBackoffUntilMs_ != 0) &&
-        (int32_t)(now - electBackoffUntilMs_) >= 0)
-    {
+    if (!claiming_ && (electBackoffUntilMs_ != 0) && (int32_t) (now - electBackoffUntilMs_) >= 0) {
       startClaiming_();
     }
 
     /* CLAIMING WINDOW: RE-ADVERTISE + RESOLVE */
     if (claiming_) {
       static uint32_t tLastClaim = 0;
-      if ((int32_t)(now - tLastClaim) > (int32_t)(SEM_MESH_CLAIM_WINDOW_MS / 3)) {
+      if ((int32_t) (now - tLastClaim) > (int32_t) (SEM_MESH_CLAIM_WINDOW_MS / 3)) {
         tx_Claim_(myId_, idxInPrioList_(myId_));
         tLastClaim = now;
       }
-      if ((int32_t)(now - claimUntilMs_) >= 0) {
+      if ((int32_t) (now - claimUntilMs_) >= 0) {
         const uint8_t rMe = idxInPrioList_(myId_);
-        if (observedLeaderRank_ == 0xFF || rMe <= observedLeaderRank_) stopClaiming_(true);
-        else                                                             stopClaiming_(false);
+        if (observedLeaderRank_ == 0xFF || rMe <= observedLeaderRank_)
+          stopClaiming_(true);
+        else
+          stopClaiming_(false);
       }
     }
     return; /* DO NOT APPLY OLD CASE WHILE IN SAFETY/ELECTION */
@@ -703,39 +777,51 @@ void TrafficLightMeshModule::followerTick_()
   /* NORMAL FOLLOWER: KEEP OUTPUTS REFRESHED (BLINKS) */
   driveOutputs_();
 
-  LOG_DEBUG("local lights(mesh): safety=%d, amber=%d, allred=%d, case=%u, offNode=%u leader=%u isLeader=%d\n",
-            (int)inSafety_, (int)inAmber_, (int)inAllRed_, (unsigned)caseIndex_, (unsigned)offNode_,
-            (unsigned)leaderId_, (int)isLeader_);
+  LOG_DEBUG("local lights(mesh): safety=%d, amber=%d, allred=%d, case=%u, offNode=%u leader=%u "
+            "isLeader=%d\n",
+            (int) inSafety_,
+            (int) inAmber_,
+            (int) inAllRed_,
+            (unsigned) caseIndex_,
+            (unsigned) offNode_,
+            (unsigned) leaderId_,
+            (int) isLeader_);
 }
 
 /* ===================================[ STATUS LED APPLY ]================================ */
-void TrafficLightMeshModule::applyCaseLocal(uint8_t c)
-{
-  if (!ledsPresent()) return;
+void TrafficLightMeshModule::applyCaseLocal(uint8_t c) {
+  if (!ledsPresent())
+    return;
   const uint8_t g = greenNode_(c);
-  if (g == myId_) leds(false, false, true);
-  else            leds(true,  false, false);
+  if (g == myId_)
+    leds(false, false, true);
+  else
+    leds(true, false, false);
 }
-void TrafficLightMeshModule::applyAmberLocal(uint8_t offNode)
-{
-  if (!ledsPresent()) return;
-  if (offNode == myId_) leds(false, true,  false);
-  else                  leds(true,  false, false);
+void TrafficLightMeshModule::applyAmberLocal(uint8_t offNode) {
+  if (!ledsPresent())
+    return;
+  if (offNode == myId_)
+    leds(false, true, false);
+  else
+    leds(true, false, false);
 }
-void TrafficLightMeshModule::applySafetyBlink()
-{
-  if (!ledsPresent()) return;
+void TrafficLightMeshModule::applySafetyBlink() {
+  if (!ledsPresent())
+    return;
   const bool on = ((millis() / SEM_MESH_AMBER_BLINK_MS) & 1) != 0;
   leds(false, on, false);
 }
 
 /* ===================================[ MAIN LOOP ]======================================= */
-int32_t TrafficLightMeshModule::runOnce()
-{
-  if (!ready_) initOnce();
+int32_t TrafficLightMeshModule::runOnce() {
+  if (!ready_)
+    initOnce();
 
-  if (isLeader_) leaderTick_();
-  else           followerTick_();
+  if (isLeader_)
+    leaderTick_();
+  else
+    followerTick_();
 
   driveOutputs_();
 
@@ -743,8 +829,7 @@ int32_t TrafficLightMeshModule::runOnce()
 }
 
 /* ===================================[ RX (Meshtastic) ]================================ */
-ProcessMessage TrafficLightMeshModule::handleReceived(const meshtastic_MeshPacket &p)
-{
+ProcessMessage TrafficLightMeshModule::handleReceived(const meshtastic_MeshPacket& p) {
   if (p.which_payload_variant != meshtastic_MeshPacket_decoded_tag)
     return ProcessMessage::CONTINUE;
   if (p.decoded.portnum != kPort)
@@ -754,7 +839,7 @@ ProcessMessage TrafficLightMeshModule::handleReceived(const meshtastic_MeshPacke
   if (n == 0 || n >= sizeof(p.decoded.payload.bytes))
     return ProcessMessage::CONTINUE;
 
-  char buf[256];
+  char         buf[256];
   const size_t m = (n < sizeof(buf) - 1) ? n : sizeof(buf) - 1;
   memcpy(buf, p.decoded.payload.bytes, m);
   buf[m] = '\0';
