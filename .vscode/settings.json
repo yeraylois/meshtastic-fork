@@ -18,8 +18,10 @@
 
   // --- FILE ASSOCIATIONS ---
   "files.associations": {
-    "**/alpine.Dockerfile": "dockerfile", // FORCE NON-STANDARD DOCKERFILE
-    "**/*Dockerfile*": "dockerfile" // MATCH ALL FILES NAMED LIKE DOCKERFILE
+    "**/alpine.Dockerfile": "dockerfile",
+    "**/*Dockerfile*": "dockerfile",
+    "*.inc": "cpp",
+    "cstdint": "cpp"
   },
 
   // --- LANGUAGE-SPECIFIC FORMATTERS ---
