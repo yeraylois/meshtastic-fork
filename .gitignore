@@ -41,3 +41,11 @@ src/mesh/raspihttp/private_key.pem
 
 # Ignore logo (set at build time with platformio-custom.py)
 data/boot/logo.*
+
+# TESTING COVERAGE FILES
+coverage_html/
+default.profraw
+*.profraw
+*.profdata
+
+.cov_orchestrator/
