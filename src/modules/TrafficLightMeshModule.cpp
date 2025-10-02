@@ -1,562 +1,860 @@
-/**************************************************************
- *   Project : Blackout Traffic Light System                  *
- *   Author  : Yeray Lois Sanchez                             *
- *   Email   : yerayloissanchez@gmail.com                     *
- **************************************************************/
+/****************************************************************
+ *   Project : Blackout Traffic Light System                    *
+ *   Module  : Traffic Light Mesh Coordinator (Leader+Follower) *
+ *   Author  : Yeray Lois Sanchez                               *
+ *   Email   : yerayloissanchez@gmail.com                       *
+ ****************************************************************/
 
 #include "TrafficLightMeshModule.h"
-#include "configuration.h"
+
 #include "mesh/MeshService.h"
+#include "mesh/generated/meshtastic/mesh.pb.h"
+
 #include "Channels.h"
-#include <string.h>
-#include <stdio.h>
+#include "configuration.h"
 
-#define LOG_TAG "Semaphore"
-
-/* =================[ LED PIN DEFINITIONS (OVERRIDE VIA -D ...) ]================ */
-#ifndef SEM_LED_RED_PIN
-  #define SEM_LED_RED_PIN   -1
+#if !defined(LOG_TAG)
+  #define LOG_TAG "TrafficMesh"
 #endif
-#ifndef SEM_LED_AMBER_PIN
-  #define SEM_LED_AMBER_PIN -1
-#endif
-#ifndef SEM_LED_GREEN_PIN
-  #define SEM_LED_GREEN_PIN -1
-#endif
-/* ============================================================================== */
-
-/* ===========================[ TOPOLOGY / START CASE ]========================== */
-#ifndef SEM_TOPOLOGY
-  #define SEM_TOPOLOGY 3
-#endif
-#ifdef SEM_START_CASE
-  #define SEM_START_CASE_DEFINED 1
-#endif
-/* ============================================================================== */
-
-/* ==============================[ TIMING (ALL NODES) ]========================== */
-#ifndef SEM_CASE_INTERVAL_MS
-  #define SEM_CASE_INTERVAL_MS 25000U
-#endif
-#ifndef SEM_AMBER_INTERVAL_MS
-  #define SEM_AMBER_INTERVAL_MS 5000U
-#endif
-#ifndef SEM_AMBER_BLINK_MS
-  #define SEM_AMBER_BLINK_MS 500U
-#endif
-/* ============================================================================== */
-
-/* =============================[ LEASE / BEACON FLAGS ]========================= */
-#ifndef SEM_BEACON_PERIOD_MS
-  #define SEM_BEACON_PERIOD_MS 2000U
-#endif
-#ifndef SEM_LOSS_TIMEOUT_MS
-  #define SEM_LOSS_TIMEOUT_MS 8000U
-#endif
-#ifndef SEM_LEASE_MS
-  #define SEM_LEASE_MS 15000U
-#endif
-#ifndef SEM_RENEW_BEFORE_MS
-  #define SEM_RENEW_BEFORE_MS 5000U
-#endif
-/* ============================================================================== */
-
-/* =============================[ ELECTION / HANDOVER ]========================== */
-#ifndef FOLLOWER_YIELD_GRACE_MS
-  #define FOLLOWER_YIELD_GRACE_MS 3000U
-#endif
-#ifndef ELECTION_BACKOFF_MIN_MS
-  #define ELECTION_BACKOFF_MIN_MS 300U
-#endif
-#ifndef ELECTION_BACKOFF_MAX_MS
-  #define ELECTION_BACKOFF_MAX_MS 800U
-#endif
-#ifndef HANDOVER_DELAY_MS
-  #define HANDOVER_DELAY_MS 700U
-#endif
-/* ============================================================================== */
 
 /* ===============================[ MESHTASTIC EXTERNS ]========================= */
-extern MeshService *service;
-extern Channels channels;
+extern MeshService* service;
+extern Channels     channels;
 /* ============================================================================== */
 
-/* =========[ COMPAT PLACEHOLDER (NOT USED, KEPT FOR LINK COMPATIBILITY) ]====== */
-const uint16_t TrafficLightMeshModule::kPhaseDurationsMs_[4] =
-    {25000, 5000, 25000, 5000};
-/* ============================================================================== */
-
-/* =============================[ PRIORITY TABLE (DEF) ]========================= */
-/* REAL DEFINITION (AVOIDS “UNDEFINED REFERENCE” DURING LINKING)                 */
-const uint8_t TrafficLightMeshModule::kPrio_[3] = {
-  #ifdef SEM_PRIORITY_0
-    (uint8_t)SEM_PRIORITY_0,
-  #else
-    0,
-  #endif
-  #ifdef SEM_PRIORITY_1
-    (uint8_t)SEM_PRIORITY_1,
-  #else
-    1,
-  #endif
-  #ifdef SEM_PRIORITY_2
-    (uint8_t)SEM_PRIORITY_2
-  #else
-    2
-  #endif
+/* ===============================[ PRIORITY TABLE DEFINITION ]========================== */
+const uint8_t TrafficLightMeshModule::kPrio_[SEM_MESH_NUM_KNOWN_NODES] = {SEM_MESH_PRIO0
+#if (SEM_MESH_NUM_KNOWN_NODES > 1)
+                                                                          ,
+                                                                          SEM_MESH_PRIO1
+#endif
+#if (SEM_MESH_NUM_KNOWN_NODES > 2)
+                                                                          ,
+                                                                          SEM_MESH_PRIO2
+#endif
 };
-/* ============================================================================== */
 
-/* =================================[ LED HELPERS ]============================== */
-static inline bool sem_hw_present()
-{
-    return SEM_LED_RED_PIN >= 0 && SEM_LED_AMBER_PIN >= 0 && SEM_LED_GREEN_PIN >= 0;
+/* ===================================[ CASE & TOPOLOGY ]================================ */
+inline uint8_t TrafficLightMeshModule::greenNode_(uint8_t c) {
+  if (c == 1)
+    return 1;
+  if (c == 2)
+    return 0;
+  return 2;
 }
-static inline void sem_leds(bool r, bool a, bool g)
-{
-    if (!sem_hw_present()) return;
-    digitalWrite(SEM_LED_RED_PIN,   r ? HIGH : LOW);
-    digitalWrite(SEM_LED_AMBER_PIN, a ? HIGH : LOW);
-    digitalWrite(SEM_LED_GREEN_PIN, g ? HIGH : LOW);
+inline uint8_t TrafficLightMeshModule::nextCaseForTopology_(uint8_t curr) {
+#if (SEM_MESH_TOPOLOGY >= 3)
+  if (curr == 2)
+    return 3;
+  if (curr == 3)
+    return 1;
+  return 2;
+#else
+  return (curr == 2) ? 3 : 2;
+#endif
 }
-/* WHO IS GREEN FOR EACH CASE: 1→ID=1, 2→ID=0, 3→ID=2                                */
-static inline uint8_t sem_green_node(uint8_t c)
-{
-    if (c == 1) return 1;
-    if (c == 2) return 0;
-    return 2; /* CASE 3 */
-}
-/* NEXT CASE BY TOPOLOGY: 3-NODE (2→1→3→2), ELSE 2-NODE (2↔1)                        */
-static inline uint8_t sem_next_case(uint8_t curr)
-{
-  #if (SEM_TOPOLOGY == 3)
-    return (curr == 2) ? 1 : ((curr == 1) ? 3 : 2);
-  #else
-    return (curr == 2) ? 1 : 2;
-  #endif
-}
-/* APPLY LOCAL LEDS FOR CURRENT CASE                                                */
-static inline void sem_apply_case(uint8_t c, uint8_t myId)
-{
-    if (!sem_hw_present()) return;
-    const uint8_t g = sem_green_node(c);
-    if (g == myId) sem_leds(false, false, true);  /* GREEN */
-    else           sem_leds(true,  false, false); /* RED   */
-}
-/* APPLY AMBER ONLY ON THE NODE THAT TURNS OFF                                      */
-static inline void sem_apply_amber_off(uint8_t offNode, uint8_t myId)
-{
-    if (!sem_hw_present()) return;
-    if (offNode == myId) sem_leds(false, true,  false); /* AMBER */
-    else                 sem_leds(true,  false, false); /* RED   */
-}
-/* SAFETY MODE: AMBER BLINK (≈ 1 HZ)                                                */
-static inline void sem_apply_safety_blink()
-{
-    if (!sem_hw_present()) return;
-    const bool on = ((millis() / SEM_AMBER_BLINK_MS) & 1) != 0;
-    sem_leds(false, on, false);
-}
-/* VERY LIGHT PRNG FOR JITTER                                                       */
-static uint32_t sem_rand32_()
-{
-    static uint32_t s = 0xA5A5F00Du ^ millis();
-    s ^= s << 13; s ^= s >> 17; s ^= s << 5;
-    return s ^ millis();
-}
-/* ============================================================================== */
 
-/* ================================== CONSTRUCTOR ================================== */
+/* =====================================[ CTOR ]========================================= */
 TrafficLightMeshModule::TrafficLightMeshModule()
-    : SinglePortModule("traffic_semaphore", kPort)
-    , concurrency::OSThread("Semaphore")
-{
-  #ifdef ROLE_LEADER
-    leaderLabel_ = "WS3-LEADER";
-  #else
-    leaderLabel_ = "T114-FOLLOWER";
-  #endif
+    : SinglePortModule("traffic_light_mesh", kPort), concurrency::OSThread("TrafficLightMesh") {}
 
-    if (sem_hw_present())
-    {
-        pinMode(SEM_LED_RED_PIN,   OUTPUT);
-        pinMode(SEM_LED_AMBER_PIN, OUTPUT);
-        pinMode(SEM_LED_GREEN_PIN, OUTPUT);
-        sem_leds(true, false, false); /* SAFE START → RED */
+/* ===================================[ STATUS LEDS ]==================================== */
+inline bool TrafficLightMeshModule::ledsPresent() {
+  return (SEM_MESH_LED_RED_PIN >= 0 && SEM_MESH_LED_AMBER_PIN >= 0 && SEM_MESH_LED_GREEN_PIN >= 0);
+}
+inline void TrafficLightMeshModule::leds(bool r, bool a, bool g) {
+  if (SEM_MESH_LED_RED_PIN >= 0)
+    digitalWrite(SEM_MESH_LED_RED_PIN, r ? HIGH : LOW);
+  if (SEM_MESH_LED_AMBER_PIN >= 0)
+    digitalWrite(SEM_MESH_LED_AMBER_PIN, a ? HIGH : LOW);
+  if (SEM_MESH_LED_GREEN_PIN >= 0)
+    digitalWrite(SEM_MESH_LED_GREEN_PIN, g ? HIGH : LOW);
+}
+
+/* ===================================[ XOR (CSV CS) ]=================================== */
+uint8_t TrafficLightMeshModule::computeXOR(const uint8_t* data, size_t len) {
+  uint8_t cs = 0;
+  while (len--)
+    cs ^= *data++;
+  return cs;
+}
+
+/* ===================================[ SIGNAL SETUP ]=================================== */
+void TrafficLightMeshModule::setupSignals_() {
+  /* VEHICLE HEAD PINMAPS */
+  vR_[VM_S2N] = SEM_MESH_V_S2N_R_PIN;
+  vA_[VM_S2N] = SEM_MESH_V_S2N_A_PIN;
+  vG_[VM_S2N] = SEM_MESH_V_S2N_G_PIN;
+  vR_[VM_S2W] = SEM_MESH_V_S2W_R_PIN;
+  vA_[VM_S2W] = SEM_MESH_V_S2W_A_PIN;
+  vG_[VM_S2W] = SEM_MESH_V_S2W_G_PIN;
+  vR_[VM_N2S] = SEM_MESH_V_N2S_R_PIN;
+  vA_[VM_N2S] = SEM_MESH_V_N2S_A_PIN;
+  vG_[VM_N2S] = SEM_MESH_V_N2S_G_PIN;
+  vR_[VM_N2W] = SEM_MESH_V_N2W_R_PIN;
+  vA_[VM_N2W] = SEM_MESH_V_N2W_A_PIN;
+  vG_[VM_N2W] = SEM_MESH_V_N2W_G_PIN;
+  vR_[VM_W2N] = SEM_MESH_V_W2N_R_PIN;
+  vA_[VM_W2N] = SEM_MESH_V_W2N_A_PIN;
+  vG_[VM_W2N] = SEM_MESH_V_W2N_G_PIN;
+  vR_[VM_W2S] = SEM_MESH_V_W2S_R_PIN;
+  vA_[VM_W2S] = SEM_MESH_V_W2S_A_PIN;
+  vG_[VM_W2S] = SEM_MESH_V_W2S_G_PIN;
+
+  /* PEDESTRIAN PINMAPS */
+  pR_[PX_N1] = SEM_MESH_P_N1_R_PIN;
+  pG_[PX_N1] = SEM_MESH_P_N1_G_PIN;
+  pR_[PX_S1] = SEM_MESH_P_S1_R_PIN;
+  pG_[PX_S1] = SEM_MESH_P_S1_G_PIN;
+  pR_[PX_W2] = SEM_MESH_P_W2_R_PIN;
+  pG_[PX_W2] = SEM_MESH_P_W2_G_PIN;
+  pR_[PX_S2] = SEM_MESH_P_S2_R_PIN;
+  pG_[PX_S2] = SEM_MESH_P_S2_G_PIN;
+  pR_[PX_N2] = SEM_MESH_P_N2_R_PIN;
+  pG_[PX_N2] = SEM_MESH_P_N2_G_PIN;
+  pR_[PX_W1] = SEM_MESH_P_W1_R_PIN;
+  pG_[PX_W1] = SEM_MESH_P_W1_G_PIN;
+
+  /* PINMODES + DEFAULTS */
+  for (uint8_t i = 0; i < VM_COUNT; ++i) {
+    if (vR_[i] >= 0)
+      pinMode(vR_[i], OUTPUT);
+    if (vA_[i] >= 0)
+      pinMode(vA_[i], OUTPUT);
+    if (vG_[i] >= 0)
+      pinMode(vG_[i], OUTPUT);
+    vState_[i] = L_RED;
+  }
+  for (uint8_t i = 0; i < PX_COUNT; ++i) {
+    if (pR_[i] >= 0)
+      pinMode(pR_[i], OUTPUT);
+    if (pG_[i] >= 0)
+      pinMode(pG_[i], OUTPUT);
+    pGreen_[i] = false;
+  }
+
+  /* FORCE ALL-RED INIT */
+  for (uint8_t i = 0; i < VM_COUNT; ++i)
+    setVehPins_(i, true, false, false);
+  for (uint8_t i = 0; i < PX_COUNT; ++i)
+    setPedPins_(i, false);
+}
+
+/* ===================================[ APPLY HELPERS ]================================== */
+inline void TrafficLightMeshModule::setVehPins_(uint8_t idx, bool r, bool a, bool g) {
+  if (vR_[idx] >= 0)
+    digitalWrite(vR_[idx], r ? HIGH : LOW);
+  if (vA_[idx] >= 0)
+    digitalWrite(vA_[idx], a ? HIGH : LOW);
+  if (vG_[idx] >= 0)
+    digitalWrite(vG_[idx], g ? HIGH : LOW);
+}
+inline void TrafficLightMeshModule::setPedPins_(uint8_t idx, bool g) {
+  if (pG_[idx] >= 0)
+    digitalWrite(pG_[idx], g ? HIGH : LOW);
+  if (pR_[idx] >= 0)
+    digitalWrite(pR_[idx], g ? LOW : HIGH);
+}
+void TrafficLightMeshModule::driveOutputs_() {
+  const bool blink = ((millis() / SEM_MESH_AMBER_BLINK_MS) & 1) != 0;
+
+  /* VEHICLE STATES */
+  for (uint8_t i = 0; i < VM_COUNT; ++i) {
+    switch (vState_[i]) {
+      case L_RED:
+        setVehPins_(i, true, false, false);
+        break;
+      case L_GREEN:
+        setVehPins_(i, false, false, true);
+        break;
+      case L_AMBER_FIXED:
+        setVehPins_(i, false, true, false);
+        break;
+      case L_AMBER_FLASH:
+        setVehPins_(i, false, blink, false);
+        break;
     }
+  }
+  /* PEDESTRIAN STATES */
+  for (uint8_t i = 0; i < PX_COUNT; ++i)
+    setPedPins_(i, pGreen_[i]);
+}
 
-  #ifdef SEM_START_CASE_DEFINED
-    caseIndex_ = (uint8_t)SEM_START_CASE;
-    if (caseIndex_ < 1 || caseIndex_ > 3) caseIndex_ = 2;
-  #else
-    caseIndex_ = 2; /* DEFAULT: MASTER GREEN */
-  #endif
+/* ===============================[ INTERSECTION CASE TABLE ]============================= */
+void TrafficLightMeshModule::applyIntersectionCase_(uint8_t c) {
+  for (uint8_t i = 0; i < VM_COUNT; ++i)
+    vState_[i] = L_RED;
+  for (uint8_t i = 0; i < PX_COUNT; ++i)
+    pGreen_[i] = false;
 
-    inAmber_     = false;
-    offNode_     = sem_green_node(caseIndex_);
-    nextCase_    = sem_next_case(caseIndex_);
-    tCaseStart_  = millis();
-    tAmberStart_ = 0;
+  switch (c) {
+    case 1:
+      /* SOUTH GOES */
+      vState_[VM_S2N] = L_GREEN;
+      vState_[VM_S2W] = L_GREEN;
+      vState_[VM_N2S] = L_RED;
+      vState_[VM_N2W] = L_AMBER_FLASH;
+      vState_[VM_W2S] = L_AMBER_FLASH;
+      vState_[VM_W2N] = L_RED;
 
-  #ifdef ROLE_LEADER
-    isLeader_      = true;
+      pGreen_[PX_N1] = true;
+      pGreen_[PX_S1] = true;
+      break;
+
+    case 2:
+      /* NORTH GOES */
+      vState_[VM_S2N] = L_RED;
+      vState_[VM_S2W] = L_RED;
+      vState_[VM_N2S] = L_GREEN;
+      vState_[VM_N2W] = L_GREEN;
+      vState_[VM_W2N] = L_RED;
+      vState_[VM_W2S] = L_AMBER_FLASH;
+
+      pGreen_[PX_W2] = true;
+      pGreen_[PX_S2] = true;
+      pGreen_[PX_N2] = true;
+      break;
+
+    default:
+      /* WEST GOES */
+      vState_[VM_S2N] = L_RED;
+      vState_[VM_S2W] = L_RED;
+      vState_[VM_N2S] = L_RED;
+      vState_[VM_N2W] = L_AMBER_FLASH;
+      vState_[VM_W2N] = L_GREEN;
+      vState_[VM_W2S] = L_GREEN;
+
+      pGreen_[PX_W1] = true;
+      pGreen_[PX_S2] = true;
+      break;
+  }
+
+  driveOutputs_(); /* APPLY IMMEDIATELY */
+}
+
+/* ---------------------- AMBER TRANSITION & ALL-RED CLEARANCE ---------------------- */
+void TrafficLightMeshModule::applyAllRed_() {
+  for (uint8_t i = 0; i < VM_COUNT; ++i)
+    vState_[i] = L_RED;
+  for (uint8_t i = 0; i < PX_COUNT; ++i)
+    pGreen_[i] = false;
+  driveOutputs_();
+}
+
+void TrafficLightMeshModule::applySafetyOutputs_() {
+  for (uint8_t i = 0; i < VM_COUNT; ++i)
+    vState_[i] = L_AMBER_FLASH;
+  for (uint8_t i = 0; i < PX_COUNT; ++i)
+    pGreen_[i] = false;
+  driveOutputs_();
+}
+
+void TrafficLightMeshModule::applyAmberTransitionForIntersection_() {
+  for (uint8_t i = 0; i < VM_COUNT; ++i)
+    vState_[i] = L_RED;
+  for (uint8_t i = 0; i < PX_COUNT; ++i)
+    pGreen_[i] = false;
+
+  /* SET AMBER ON THE MOVEMENTS THAT WERE GREEN IN THE CURRENT CASE */
+  switch (caseIndex_) {
+    case 1:
+      vState_[VM_S2N] = L_AMBER_FIXED;
+      vState_[VM_S2W] = L_AMBER_FIXED;
+      break;
+    case 2:
+      vState_[VM_N2S] = L_AMBER_FIXED;
+      vState_[VM_N2W] = L_AMBER_FIXED;
+      break;
+    default:
+      vState_[VM_W2N] = L_AMBER_FIXED;
+      vState_[VM_W2S] = L_AMBER_FIXED;
+      break;
+  }
+  driveOutputs_();
+}
+
+/* ===================================[ INIT ONCE ]====================================== */
+void TrafficLightMeshModule::initOnce() {
+  if (ready_)
+    return;
+
+  /* OPTIONAL STATUS LEDS */
+  if (ledsPresent()) {
+    pinMode(SEM_MESH_LED_RED_PIN, OUTPUT);
+    pinMode(SEM_MESH_LED_AMBER_PIN, OUTPUT);
+    pinMode(SEM_MESH_LED_GREEN_PIN, OUTPUT);
+    leds(true, false, false); /* SAFE START -> RED */
+  }
+
+  /* SIGNAL ARRAYS */
+  setupSignals_();
+
+  /* INITIAL PHASE */
+  caseIndex_    = 2;
+  nextCase_     = nextCaseForTopology_(caseIndex_);
+  inAmber_      = false;
+  inAllRed_     = false;
+  offNode_      = greenNode_(caseIndex_);
+  tCaseStart_   = millis();
+  tAmberStart_  = 0;
+  tAllRedStart_ = 0;
+
+  /* ROLE TIMERS */
+  if (isLeader_) {
     leaderId_      = myId_;
-    leaseExpiryMs_ = millis() + SEM_LEASE_MS;
-  #else
-    isLeader_      = false;
-    leaderId_      = 0; /* UNKNOWN UNTIL FIRST BEACON */
-    leaseExpiryMs_ = 0;
-  #endif
+    leaseExpiryMs_ = millis() + SEM_MESH_LEASE_MS;
+    nextBeaconAt_  = millis();
+    seq_           = 0;
+  } else {
+    leaderId_          = 0xFF;
+    lastBeaconRxMs_    = 0;
+    seenLeaseExpiryMs_ = 0;
 
-    nextBeaconAt_ = millis();
-    sem_apply_case(caseIndex_, myId_);
-
-    LOG_INFO("CONSTRUCTOR (role=%s) start_case=%u myId=%u\n",
-             isLeader_ ? "LEADER" : "FOLLOWER",
-             (unsigned)caseIndex_, (unsigned)myId_);
-}
-/* ============================================================================== */
-
-/* =============================== COOPERATIVE LOOP ============================== */
-int32_t TrafficLightMeshModule::runOnce()
-{
-    const uint32_t now = millis();
-
-    /* DEFERRED HANDOVER (SMOOTH SWITCH) */
-    if (handoverAt_ && (int32_t)(now - handoverAt_) >= 0)
-    {
-        const bool willLead = (leaderId_ == myId_);
-        isLeader_ = willLead;
-
-        if (willLead)
-        {
-            leaseExpiryMs_ = now + SEM_LEASE_MS;
-            nextBeaconAt_  = 0;
-            exitSafety_();
-            LOG_INFO("handover: I AM THE LEADER NOW (id=%u)\n", (unsigned)myId_);
-        }
-        else
-        {
-            noSafetyUntil_        = now + FOLLOWER_YIELD_GRACE_MS;
-            lastBeaconRxMs_       = now;
-            electionBackoffUntil_ = 0;
-            inSafety_             = false;
-            LOG_INFO("handover: I YIELDED TO LEADER id=%u\n", (unsigned)leaderId_);
-        }
-
-        handoverAt_ = 0;
-    }
-
-    if (isLeader_) leaderTick_();
-    else           followerTick_();
-
-    return 50; /* MS */
-}
-/* ============================================================================== */
-
-/* ================================== LEADER SIDE ================================= */
-void TrafficLightMeshModule::leaderTick_()
-{
-    const uint32_t now = millis();
-
-    /* LEASE RENEWAL WITH MARGIN */
-    if ((int32_t)(leaseExpiryMs_ - now) <= (int32_t)SEM_RENEW_BEFORE_MS)
-    {
-        leaseExpiryMs_ = now + SEM_LEASE_MS;
-        LOG_INFO("lease_renew → expires_in=%lu ms\n",
-                 (unsigned long)(leaseExpiryMs_ - now));
-    }
-
-    /* STABLE GREEN → AMBER → NEXT CASE */
-    if (!inAmber_)
-    {
-        if ((int32_t)(now - tCaseStart_) >= (int32_t)SEM_CASE_INTERVAL_MS)
-        {
-            inAmber_     = true;
-            tAmberStart_ = now;
-            offNode_     = sem_green_node(caseIndex_);
-            nextCase_    = sem_next_case(caseIndex_);
-
-            sem_apply_amber_off(offNode_, myId_);
-            LOG_INFO("AMBER BEGIN offNode=%u (from case=%u)\n",
-                     (unsigned)offNode_, (unsigned)caseIndex_);
-        }
-    }
-    else
-    {
-        if ((int32_t)(now - tAmberStart_) >= (int32_t)SEM_AMBER_INTERVAL_MS)
-        {
-            inAmber_     = false;
-            caseIndex_   = nextCase_;
-            tCaseStart_  = now;
-
-            sem_apply_case(caseIndex_, myId_);
-            LOG_INFO("CASE APPLY %u\n", (unsigned)caseIndex_);
-        }
-    }
-
-    /* PERIODIC BEACON */
-    if ((int32_t)(now - nextBeaconAt_) >= 0)
-    {
-        sendBeacon_();
-        nextBeaconAt_ = now + SEM_BEACON_PERIOD_MS;
-    }
-}
-/* ============================================================================== */
-
-/* =================================== TX BEACON ================================== */
-void TrafficLightMeshModule::sendBeacon_()
-{
-    const uint32_t now = millis();
-
-    const uint32_t elapsed = (!inAmber_) ? (now - tCaseStart_)
-                                         : (now - tAmberStart_);
-    const uint32_t leaseTt = (leaseExpiryMs_ > now) ? (leaseExpiryMs_ - now) : 0;
-
-    /* COMPACT JSON WITH NUMERIC LEADER ID (lid) FOR PREEMPTION/ELECTION */
-    char json[192];
-    snprintf(json, sizeof(json),
-             "{\"t\":\"B\",\"id\":\"%s\",\"lid\":%u,\"seq\":%lu,"
-             "\"c\":%u,\"am\":%u,\"off\":%u,\"pe\":%lu,\"lt\":%lu}",
-             leaderLabel_, (unsigned)myId_, (unsigned long)seq_,
-             (unsigned)caseIndex_, (unsigned)(inAmber_ ? 1 : 0),
-             (unsigned)offNode_, (unsigned long)elapsed, (unsigned long)leaseTt);
-    seq_++;
-
-    meshtastic_MeshPacket *pkt = (meshtastic_MeshPacket *)calloc(1, sizeof(*pkt));
-    if (!pkt)
-    {
-        LOG_ERROR("sendBeacon_: OOM\n");
-        return;
-    }
-
-    pkt->to         = NODENUM_BROADCAST;
-    pkt->channel    = channels.getPrimaryIndex();
-    pkt->want_ack   = false;
-    pkt->hop_start  = 0;
-    pkt->hop_limit  = 0;
-
-    pkt->which_payload_variant = meshtastic_MeshPacket_decoded_tag;
-    pkt->decoded.portnum       = kPort;
-    pkt->decoded.want_response = false;
-
-    const size_t len = strnlen(json, sizeof(pkt->decoded.payload.bytes));
-    pkt->decoded.payload.size = len;
-    memcpy(pkt->decoded.payload.bytes, json, len);
-
-    service->sendToMesh(pkt);
-
-    LOG_DEBUG("beacon_tx: %s\n", json);
-}
-/* ============================================================================== */
-
-/* ================================= FOLLOWER SIDE ================================ */
-void TrafficLightMeshModule::followerTick_()
-{
-    const uint32_t now = millis();
-
-    /* LONG BEACON LOSS → SAFETY (WITH YIELD GRACE) */
-    if (!inSafety_ && lastBeaconRxMs_ != 0 &&
-        (int32_t)(now - lastBeaconRxMs_) > (int32_t)SEM_LOSS_TIMEOUT_MS &&
-        (int32_t)(now - noSafetyUntil_) >= 0)
-    {
-        enterSafety_();
-
-        const uint8_t  rank = idxInPrioList_(myId_);
-        const uint32_t wait = computeBackoffMs_(rank);
-        electionBackoffUntil_ = now + wait;
-        LOG_INFO("election: BACKOFF UNTIL %lu ms (rank=%u)\n",
-                 (unsigned long)electionBackoffUntil_, (unsigned)rank);
-    }
-
-    /* BACKOFF EXPIRED AND STILL NO BEACONS → SELF-PROMOTE */
-    if (!isLeader_ && inSafety_ && electionBackoffUntil_ &&
-        (int32_t)(now - electionBackoffUntil_) >= 0 &&
-        (int32_t)(now - lastBeaconRxMs_) > (int32_t)SEM_LOSS_TIMEOUT_MS)
-    {
-        leaderId_          = myId_;
-        handoverAt_        = now + HANDOVER_DELAY_MS;
-        electionBackoffUntil_ = 0;
-        LOG_INFO("election: SELF-PROMOTE TO LEADER (id=%u)\n", (unsigned)myId_);
-    }
-
-    /* LOCAL LEDS */
-    if (inSafety_) sem_apply_safety_blink();
-    else           (inAmber_ ? sem_apply_amber_off(offNode_, myId_)
-                             : sem_apply_case(caseIndex_,   myId_));
-
-    LOG_DEBUG("local lights: safety=%d, amber=%d, case=%u, offNode=%u leader=%u isLeader=%d\n",
-              (int)inSafety_, (int)inAmber_, (unsigned)caseIndex_, (unsigned)offNode_,
-              (unsigned)leaderId_, (int)isLeader_);
-}
-/* ============================================================================== */
-
-/* =================================== SAFETY MODE ================================== */
-void TrafficLightMeshModule::enterSafety_()
-{
+    /* START IN SAFETY */
     inSafety_ = true;
-    sem_leds(false, false, false);
-    LOG_WARN("safety_enter (NO BEACON > %u ms)\n", (unsigned)SEM_LOSS_TIMEOUT_MS);
+    scheduleElectionBackoff_();
+
+    /** STARTUP LOWER-ID OBSERVER */
+    seenLowerId_            = false;
+    startupLowerDeadlineMs_ = millis() + SEM_MESH_STARTUP_WAIT_LOWER_MS;
+
+    LOG_WARN("safety_enter (startup)\n");
+  }
+
+  /* APPLY INITIAL INTERSECTION */
+  applyIntersectionCase_(caseIndex_);
+
+  ready_ = true;
+
+  LOG_INFO("INIT(mesh): id=%u role=%s topo=%u\n",
+           (unsigned) myId_,
+           isLeader_ ? "LEADER" : "FOLLOWER",
+           (unsigned) SEM_MESH_TOPOLOGY);
 }
-void TrafficLightMeshModule::exitSafety_()
-{
-    if (inSafety_)
-    {
-        inSafety_ = false;
-        LOG_INFO("safety_exit (VALID BEACON)\n");
-    }
+
+/* ===================================[ MESH TX ]======================================== */
+void TrafficLightMeshModule::sendPayload_(const char* buf, size_t len) {
+  meshtastic_MeshPacket* pkt = (meshtastic_MeshPacket*) calloc(1, sizeof(*pkt));
+  if (!pkt) {
+    LOG_ERROR("sendPayload_: OOM\n");
+    return;
+  }
+  pkt->to        = NODENUM_BROADCAST;
+  pkt->channel   = channels.getPrimaryIndex();
+  pkt->want_ack  = false;
+  pkt->hop_start = 0;
+  pkt->hop_limit = 0;
+
+  pkt->which_payload_variant = meshtastic_MeshPacket_decoded_tag;
+  pkt->decoded.portnum       = kPort;
+  pkt->decoded.want_response = false;
+
+  const size_t n =
+      (len < sizeof(pkt->decoded.payload.bytes)) ? len : sizeof(pkt->decoded.payload.bytes);
+  pkt->decoded.payload.size = n;
+  memcpy(pkt->decoded.payload.bytes, buf, n);
+
+  service->sendToMesh(pkt);
 }
-/* ============================================================================== */
+void TrafficLightMeshModule::sendBeacon_() {
+  const uint32_t now     = millis();
+  const uint32_t elapsed = (!inAmber_ && !inAllRed_)
+                               ? (now - tCaseStart_)
+                               : (inAmber_ ? (now - tAmberStart_) : (now - tAllRedStart_));
+  const uint32_t leaseTt = (leaseExpiryMs_ > now) ? (leaseExpiryMs_ - now) : 0;
+  const uint8_t  amField = inAllRed_ ? 2 : (inAmber_ ? 1 : 0);
 
-/* =============================== RX ON PRIVATE_APP =============================== */
-ProcessMessage TrafficLightMeshModule::handleReceived(const meshtastic_MeshPacket &p)
-{
-    if (p.which_payload_variant != meshtastic_MeshPacket_decoded_tag)
-        return ProcessMessage::CONTINUE;
-    if (p.decoded.portnum != kPort)
-        return ProcessMessage::CONTINUE;
+  tx_Beacon_(myId_, seq_, caseIndex_, amField, offNode_, leaseTt, elapsed);
+  seq_++;
+}
+void TrafficLightMeshModule::tx_Beacon_(uint8_t  leaderId,
+                                        uint32_t seq,
+                                        uint8_t  c,
+                                        uint8_t  am,
+                                        uint8_t  off,
+                                        uint32_t leaseTtlMs,
+                                        uint32_t elapsedMs) {
+  char p[96];
+  int  L = snprintf(p,
+                   sizeof(p),
+                   "B,%u,%lu,%u,%u,%u,%lu,%lu",
+                   (unsigned) leaderId,
+                   (unsigned long) seq,
+                   (unsigned) c,
+                   (unsigned) am,
+                   (unsigned) off,
+                   (unsigned long) leaseTtlMs,
+                   (unsigned long) elapsedMs);
+  if (L < 0)
+    return;
+  uint8_t cs = computeXOR(reinterpret_cast<const uint8_t*>(p), (size_t) L);
 
-    const size_t n = p.decoded.payload.size;
-    if (n == 0 || n >= sizeof(p.decoded.payload.bytes))
-        return ProcessMessage::CONTINUE;
+  char f[112];
+  int  F = snprintf(f, sizeof(f), "%s*%02X\n", p, cs);
+  if (F > 0)
+    sendPayload_(f, (size_t) F);
 
-    char buf[256];
-    const size_t m = (n < sizeof(buf) - 1) ? n : sizeof(buf) - 1;
-    memcpy(buf, p.decoded.payload.bytes, m);
-    buf[m] = '\0';
+  LOG_DEBUG("beacon_tx(mesh): %s\n", p);
+}
+void TrafficLightMeshModule::tx_Claim_(uint8_t id, uint8_t rank) {
+  char p[32];
+  int  L = snprintf(p, sizeof(p), "C,%u,%u", (unsigned) id, (unsigned) rank);
+  if (L < 0)
+    return;
+  uint8_t cs = computeXOR(reinterpret_cast<const uint8_t*>(p), (size_t) L);
 
-    /* EXPECTS: {"t":"B","id":"...","lid":N,"seq":N,"c":X,"am":Y,"off":Z,"pe":N,"lt":N} */
-    uint8_t  c = 2, am = 0, off = 0, lidNum = 0xFF;
-    uint32_t pe = 0, lt = 0, seq = 0;
-    char     leaderName[32] = {0};
+  char f[48];
+  int  F = snprintf(f, sizeof(f), "%s*%02X\n", p, cs);
+  if (F > 0)
+    sendPayload_(f, (size_t) F);
+}
+void TrafficLightMeshModule::tx_Yield_(uint8_t fromId, uint8_t toId) {
+  char p[32];
+  int  L = snprintf(p, sizeof(p), "Y,%u,%u", (unsigned) fromId, (unsigned) toId);
+  if (L < 0)
+    return;
+  uint8_t cs = computeXOR(reinterpret_cast<const uint8_t*>(p), (size_t) L);
 
-    if (!parseLeaderBeaconJson_(buf, c, am, off, pe, lt, seq, lidNum, leaderName, sizeof(leaderName)))
-        return ProcessMessage::CONTINUE;
+  char f[48];
+  int  F = snprintf(f, sizeof(f), "%s*%02X\n", p, cs);
+  if (F > 0)
+    sendPayload_(f, (size_t) F);
+}
+
+/* ===================================[ CSV UTILS ]====================================== */
+bool TrafficLightMeshModule::parseCSV_u8(const char*& p, uint8_t& out) {
+  char*         end = nullptr;
+  unsigned long v   = strtoul(p, &end, 10);
+  if (end == p)
+    return false;
+  out = (uint8_t) v;
+  p   = (*end == ',') ? end + 1 : end;
+  return true;
+}
+bool TrafficLightMeshModule::parseCSV_u16(const char*& p, uint16_t& out) {
+  char*         end = nullptr;
+  unsigned long v   = strtoul(p, &end, 10);
+  if (end == p)
+    return false;
+  out = (uint16_t) v;
+  p   = (*end == ',') ? end + 1 : end;
+  return true;
+}
+bool TrafficLightMeshModule::parseCSV_u32(const char*& p, uint32_t& out) {
+  char*         end = nullptr;
+  unsigned long v   = strtoul(p, &end, 10);
+  if (end == p)
+    return false;
+  out = (uint32_t) v;
+  p   = (*end == ',') ? end + 1 : end;
+  return true;
+}
+
+/* ===================================[ PROTOCOL RX ]==================================== */
+void TrafficLightMeshModule::handleLine_(const char* lineZ) {
+  const char* star = strchr(lineZ, '*');
+  if (!star)
+    return;
+
+  const size_t payLen = (size_t) (star - lineZ);
+  uint8_t      csRx   = (uint8_t) strtoul(star + 1, nullptr, 16);
+  if (computeXOR(reinterpret_cast<const uint8_t*>(lineZ), payLen) != csRx)
+    return;
+
+  if (lineZ[1] != ',')
+    return;
+  const char  type = lineZ[0];
+  const char* p    = lineZ + 2;
+
+  if (type == 'B') {
+    uint8_t  lid = 0, c = 2, am = 0, off = 0;
+    uint32_t seq = 0, lt = 0, pe = 0;
+    if (!parseCSV_u8(p, lid))
+      return;
+    if (!parseCSV_u32(p, seq))
+      return;
+    if (!parseCSV_u8(p, c))
+      return;
+    if (!parseCSV_u8(p, am))
+      return;
+    if (!parseCSV_u8(p, off))
+      return;
+    if (!parseCSV_u32(p, lt))
+      return;
+    if (!parseCSV_u32(p, pe))
+      return;
 
     const uint32_t now = millis();
+    lastBeaconRxMs_    = now;
+    seenLeaseExpiryMs_ = now + lt;
+    leaderId_          = lid;
 
-    lastBeaconRxMs_       = now;
-    seenLeaseExpiryMs_    = now + lt;
-    noSafetyUntil_        = 0;
-    electionBackoffUntil_ = 0;
+    observeRemoteId_(lid); /* LOWER-ID OBSERVER */
 
-    /* IF I AM LEADER AND A HIGHER-PRIORITY LEADER APPEARS → YIELD */
-    if (isLeader_ && lidNum != myId_ && isHigherPriority_(lidNum, myId_))
-    {
-        leaderId_   = lidNum;
-        handoverAt_ = now + HANDOVER_DELAY_MS;
-        LOG_INFO("preempted: HIGHER-PRIORITY LEADER id=%u\n", (unsigned)lidNum);
-        return ProcessMessage::CONTINUE;
+    /* ADOPT REMOTE PHASE */
+    caseIndex_ = (c >= 1 && c <= 3) ? c : 2;
+    inAmber_   = (am == 1);
+    inAllRed_  = (am == 2);
+    offNode_   = off;
+
+    /* ELECTION INTERACTION */
+    const uint8_t rSeen = idxInPrioList_(lid);
+    observedLeaderRank_ = rSeen;
+    if (claiming_) {
+      const uint8_t rMe = idxInPrioList_(myId_);
+      if (rSeen < rMe)
+        stopClaiming_(false);
     }
 
-    /* IF I AM FOLLOWER, ADOPT THE BEST VISIBLE LEADER */
-    if (!isLeader_)
-    {
-        if (leaderId_ == 0xFF || leaderId_ == 0 || isHigherPriority_(lidNum, leaderId_))
-            leaderId_ = lidNum;
-
-        exitSafety_();
-
-        caseIndex_ = (c >= 1 && c <= 3) ? c : 2;
-        inAmber_   = (am != 0);
-        offNode_   = off;
-
-        if (inAmber_) sem_apply_amber_off(offNode_, myId_);
-        else          sem_apply_case(caseIndex_,   myId_);
-
-        LOG_INFO("beacon_rx id=%s lid=%u seq=%lu case=%u am=%u off=%u pe=%lu lt=%lu\n",
-                 leaderName, (unsigned)lidNum, (unsigned long)seq,
-                 (unsigned)caseIndex_, (unsigned)inAmber_, (unsigned)offNode_,
-                 (unsigned long)pe, (unsigned long)lt);
-
-        /* OPTIONAL PREEMPTION: IF I HAVE HIGHER PRIORITY THAN EMITTER, TAKE OVER */
-        if (isHigherPriority_(myId_, lidNum))
-        {
-            leaderId_   = myId_;
-            handoverAt_ = now + HANDOVER_DELAY_MS;
-            LOG_INFO("preempt: SCHEDULING TAKEOVER (me=%u) OVER id=%u\n",
-                     (unsigned)myId_, (unsigned)lidNum);
-        }
+    /* YIELD IF SEE HIGHER PRIORITY */
+    if (isLeader_ && lid != myId_) {
+      const uint8_t rM = idxInPrioList_(myId_);
+      if (rSeen < rM) {
+        yieldTo_(lid);
+      }
     }
 
+    /* EXIT SAFETY */
+    if (inSafety_) {
+      inSafety_ = false;
+      LOG_INFO("safety_exit (beacon)\n");
+    }
+
+    /* APPLY PHASE LOCALLY (FOLLOWER) */
+    if (!isLeader_) {
+      if (inAllRed_) {
+        applyAllRed_();
+      } else if (inAmber_) {
+        applyAmberTransitionForIntersection_();
+        applyAmberLocal(offNode_);
+      } else {
+        applyIntersectionCase_(caseIndex_);
+      }
+    }
+
+    LOG_DEBUG("beacon_rx(mesh): L=%u seq=%lu c=%u am=%u off=%u lt=%lu pe=%lu\n",
+              (unsigned) lid,
+              (unsigned long) seq,
+              (unsigned) c,
+              (unsigned) am,
+              (unsigned) off,
+              (unsigned long) lt,
+              (unsigned long) pe);
+    return;
+  }
+
+  if (type == 'C') {
+    uint8_t id = 0, rank = 0xFF;
+    if (!parseCSV_u8(p, id))
+      return;
+    if (!parseCSV_u8(p, rank))
+      return;
+
+    observeRemoteId_(id); /* LOWER-ID OBSERVER */
+
+    if (claiming_) {
+      const uint8_t rMe = idxInPrioList_(myId_);
+      if (rank < rMe)
+        stopClaiming_(false);
+    }
+
+    if (isLeader_ && id != myId_) {
+      const uint8_t rM = idxInPrioList_(myId_);
+      if (rank < rM) {
+        yieldTo_(id);
+      }
+    }
+    return;
+  }
+
+  if (type == 'Y') {
+    /* INFORMATIONAL ONLY */
+    return;
+  }
+
+  if (type == 'A') {
+    uint8_t off = 0;
+    if (!parseCSV_u8(p, off))
+      return;
+    if (!isLeader_) {
+      inAmber_  = true;
+      inAllRed_ = false;
+      offNode_  = off;
+      applyAmberTransitionForIntersection_();
+      applyAmberLocal(offNode_);
+    }
+    return;
+  }
+
+  if (type == 'S') {
+    uint8_t c = 2;
+    if (!parseCSV_u8(p, c))
+      return;
+    if (!isLeader_) {
+      inAmber_   = false;
+      inAllRed_  = false;
+      caseIndex_ = (c >= 1 && c <= 3) ? c : 2;
+      applyIntersectionCase_(caseIndex_);
+    }
+    return;
+  }
+}
+
+/* ===================================[ ELECTION ]======================================= */
+uint8_t TrafficLightMeshModule::idxInPrioList_(uint8_t id) const {
+  for (uint8_t i = 0; i < SEM_MESH_NUM_KNOWN_NODES; ++i)
+    if (kPrio_[i] == id)
+      return i;
+  return 0xFE; /* NOT FOUND => VERY LOW PRIORITY */
+}
+void TrafficLightMeshModule::scheduleElectionBackoff_() {
+  const uint8_t  r      = idxInPrioList_(myId_);
+  const uint32_t jitter = (uint32_t) random(SEM_MESH_ELECT_JITTER_MS + 1);
+  electBackoffUntilMs_  = millis() + SEM_MESH_ELECT_BACKOFF_BASE_MS
+                         + (uint32_t) r * SEM_MESH_ELECT_BACKOFF_STEP_MS + jitter;
+  observedLeaderRank_ = 0xFF;
+  LOG_INFO("election: backoff until %lu ms (rank=%u)\n",
+           (unsigned long) electBackoffUntilMs_,
+           (unsigned) r);
+}
+void TrafficLightMeshModule::startClaiming_() {
+  if (claiming_)
+    return;
+  claiming_     = true;
+  claimUntilMs_ = millis() + SEM_MESH_CLAIM_WINDOW_MS;
+  tx_Claim_(myId_, idxInPrioList_(myId_));
+  LOG_INFO("election: CLAIM start (id=%u)\n", (unsigned) myId_);
+}
+void TrafficLightMeshModule::stopClaiming_(bool won) {
+  if (!claiming_)
+    return;
+  claiming_ = false;
+  if (won) {
+    becomeLeaderFromHere_();
+  } else {
+    LOG_INFO("election: CLAIM aborted (lost)\n");
+  }
+}
+void TrafficLightMeshModule::becomeLeaderFromHere_() {
+  isLeader_      = true;
+  leaderId_      = myId_;
+  leaseExpiryMs_ = millis() + SEM_MESH_LEASE_MS;
+  nextBeaconAt_  = 0; /* SEND ASAP */
+  seq_           = 0;
+
+  if (inSafety_)
+    inSafety_ = false;
+
+  LOG_INFO("election: I AM THE LEADER NOW (id=%u)\n", (unsigned) myId_);
+}
+void TrafficLightMeshModule::yieldTo_(uint8_t newLeader) {
+  if (!isLeader_)
+    return;
+
+  tx_Yield_(myId_, newLeader);
+
+  isLeader_ = false;
+  leaderId_ = newLeader;
+  claiming_ = false;
+  inSafety_ = true; /* WAIT UNTIL NEW BEACON ARRIVES */
+  LOG_INFO("handover: I yielded to leader id=%u\n", (unsigned) newLeader);
+}
+inline void TrafficLightMeshModule::observeRemoteId_(uint8_t remoteId) {
+  if (remoteId < myId_)
+    seenLowerId_ = true;
+}
+
+/* ===================================[ LEADER SIDE ]==================================== */
+void TrafficLightMeshModule::leaderTick_() {
+  const uint32_t now = millis();
+
+  /* LEASE RENEWAL WITH MARGIN */
+  if ((int32_t) (leaseExpiryMs_ - now) <= (int32_t) SEM_MESH_RENEW_BEFORE_MS) {
+    leaseExpiryMs_ = now + SEM_MESH_LEASE_MS;
+    LOG_INFO("lease_renew -> expires_in=%lu ms\n", (unsigned long) (leaseExpiryMs_ - now));
+  }
+
+  /* SEQUENCE: STABLE -> AMBER -> ALL_RED -> NEXT CASE (SYNC BEACONS AT EACH EDGE) */
+  if (!inAmber_ && !inAllRed_) {
+    if ((int32_t) (now - tCaseStart_) >= (int32_t) SEM_MESH_CASE_INTERVAL_MS) {
+      inAmber_     = true;
+      tAmberStart_ = now;
+      offNode_     = greenNode_(caseIndex_);
+      nextCase_    = nextCaseForTopology_(caseIndex_);
+
+      applyAmberTransitionForIntersection_(); /* REAL AMBER ON HEADS */
+      applyAmberLocal(offNode_);              /* STATUS LED */
+
+      sendBeacon_(); /* am=1 */
+      nextBeaconAt_ = now + SEM_MESH_BEACON_PERIOD_MS;
+
+      LOG_INFO(
+          "AMBER begin offNode=%u (from case=%u)\n", (unsigned) offNode_, (unsigned) caseIndex_);
+    }
+  } else if (inAmber_ && !inAllRed_) {
+    if ((int32_t) (now - tAmberStart_) >= (int32_t) SEM_MESH_AMBER_INTERVAL_MS) {
+      inAmber_      = false;
+      inAllRed_     = true;
+      tAllRedStart_ = now;
+
+      applyAllRed_();
+
+      sendBeacon_(); /* am=2 */
+      nextBeaconAt_ = now + SEM_MESH_BEACON_PERIOD_MS;
+    }
+  } else { /* inAllRed_ */
+    if ((int32_t) (now - tAllRedStart_) >= (int32_t) SEM_MESH_ALL_RED_MS) {
+      inAllRed_   = false;
+      caseIndex_  = nextCase_;
+      tCaseStart_ = now;
+
+      applyCaseLocal(caseIndex_);
+      applyIntersectionCase_(caseIndex_);
+
+      sendBeacon_(); /* am=0, c=new */
+      nextBeaconAt_ = now + SEM_MESH_BEACON_PERIOD_MS;
+
+      LOG_INFO("CASE apply %u\n", (unsigned) caseIndex_);
+    }
+  }
+
+  /* PERIODIC BEACON (REDUNDANCY) */
+  if ((int32_t) (now - nextBeaconAt_) >= 0) {
+    sendBeacon_();
+    nextBeaconAt_ = now + SEM_MESH_BEACON_PERIOD_MS;
+  }
+}
+
+/* ===================================[ FOLLOWER SIDE ]================================== */
+void TrafficLightMeshModule::followerTick_() {
+  const uint32_t now = millis();
+
+  /* BEACON LOSS -> SAFETY + ELECTION */
+  if (!inSafety_ && lastBeaconRxMs_ != 0
+      && (int32_t) (now - lastBeaconRxMs_) > (int32_t) SEM_MESH_LOSS_TIMEOUT_MS) {
+    inSafety_ = true;
+    applySafetyOutputs_();
+    scheduleElectionBackoff_();
+    LOG_WARN("safety_enter (no beacon > %u ms)\n", (unsigned) SEM_MESH_LOSS_TIMEOUT_MS);
+  }
+
+  if (inSafety_) {
+    applySafetyOutputs_();
+    applySafetyBlink();
+
+    /** STARTUP LOWER-ID POLICY:
+     * IF WE HAVE NOT HEARD ANY LOWER-ID NODE BY THE DEADLINE, START CLAIMING
+     */
+    if (!claiming_ && startupLowerDeadlineMs_ != 0
+        && (int32_t) (now - startupLowerDeadlineMs_) >= 0) {
+      if (!seenLowerId_) {
+        LOG_INFO("startup_lower_id: no lower-ID heard -> start claiming now\n");
+        startClaiming_();
+        startupLowerDeadlineMs_ = 0;
+      } else {
+        startupLowerDeadlineMs_ = 0;
+      }
+    }
+
+    /* NORMAL BACKOFF WAIT */
+    if (electBackoffUntilMs_ && (int32_t) (now - electBackoffUntilMs_) < 0) {
+      return;
+    }
+
+    /* START CLAIM IF STILL NO BEACON */
+    if (!claiming_ && (electBackoffUntilMs_ != 0) && (int32_t) (now - electBackoffUntilMs_) >= 0) {
+      startClaiming_();
+    }
+
+    /* CLAIMING WINDOW: RE-ADVERTISE + RESOLVE */
+    if (claiming_) {
+      static uint32_t tLastClaim = 0;
+      if ((int32_t) (now - tLastClaim) > (int32_t) (SEM_MESH_CLAIM_WINDOW_MS / 3)) {
+        tx_Claim_(myId_, idxInPrioList_(myId_));
+        tLastClaim = now;
+      }
+      if ((int32_t) (now - claimUntilMs_) >= 0) {
+        const uint8_t rMe = idxInPrioList_(myId_);
+        if (observedLeaderRank_ == 0xFF || rMe <= observedLeaderRank_)
+          stopClaiming_(true);
+        else
+          stopClaiming_(false);
+      }
+    }
+    return; /* DO NOT APPLY OLD CASE WHILE IN SAFETY/ELECTION */
+  }
+
+  /* NORMAL FOLLOWER: KEEP OUTPUTS REFRESHED (BLINKS) */
+  driveOutputs_();
+
+  LOG_DEBUG("local lights(mesh): safety=%d, amber=%d, allred=%d, case=%u, offNode=%u leader=%u "
+            "isLeader=%d\n",
+            (int) inSafety_,
+            (int) inAmber_,
+            (int) inAllRed_,
+            (unsigned) caseIndex_,
+            (unsigned) offNode_,
+            (unsigned) leaderId_,
+            (int) isLeader_);
+}
+
+/* ===================================[ STATUS LED APPLY ]================================ */
+void TrafficLightMeshModule::applyCaseLocal(uint8_t c) {
+  if (!ledsPresent())
+    return;
+  const uint8_t g = greenNode_(c);
+  if (g == myId_)
+    leds(false, false, true);
+  else
+    leds(true, false, false);
+}
+void TrafficLightMeshModule::applyAmberLocal(uint8_t offNode) {
+  if (!ledsPresent())
+    return;
+  if (offNode == myId_)
+    leds(false, true, false);
+  else
+    leds(true, false, false);
+}
+void TrafficLightMeshModule::applySafetyBlink() {
+  if (!ledsPresent())
+    return;
+  const bool on = ((millis() / SEM_MESH_AMBER_BLINK_MS) & 1) != 0;
+  leds(false, on, false);
+}
+
+/* ===================================[ MAIN LOOP ]======================================= */
+int32_t TrafficLightMeshModule::runOnce() {
+  if (!ready_)
+    initOnce();
+
+  if (isLeader_)
+    leaderTick_();
+  else
+    followerTick_();
+
+  driveOutputs_();
+
+  return 25; /* RUN AGAIN IN '25ms' */
+}
+
+/* ===================================[ RX (Meshtastic) ]================================ */
+ProcessMessage TrafficLightMeshModule::handleReceived(const meshtastic_MeshPacket& p) {
+  if (p.which_payload_variant != meshtastic_MeshPacket_decoded_tag)
     return ProcessMessage::CONTINUE;
-}
-/* ============================================================================== */
+  if (p.decoded.portnum != kPort)
+    return ProcessMessage::CONTINUE;
 
-/* ================================ FAST JSON PARSER =============================== */
-bool TrafficLightMeshModule::parseLeaderBeaconJson_(
-    const char *s, uint8_t &outCase, uint8_t &outAmber, uint8_t &outOffNode,
-    uint32_t &outPe, uint32_t &outLt, uint32_t &outSeq, uint8_t &outLeaderIdNum,
-    char *outLeader, size_t outLeaderSz)
-{
-    if (!strstr(s, "\"t\":\"B\"")) return false;
+  const size_t n = p.decoded.payload.size;
+  if (n == 0 || n >= sizeof(p.decoded.payload.bytes))
+    return ProcessMessage::CONTINUE;
 
-    bool ok = true;
-    ok &= findU8_(s,  "\"c\"",   outCase);
-    ok &= findU8_(s,  "\"am\"",  outAmber);
-    ok &= findU8_(s,  "\"off\"", outOffNode);
-    ok &= findUInt_(s,"\"pe\"",  outPe);
-    ok &= findUInt_(s,"\"lt\"",  outLt);
-    ok &= findUInt_(s,"\"seq\"", outSeq);
+  char         buf[256];
+  const size_t m = (n < sizeof(buf) - 1) ? n : sizeof(buf) - 1;
+  memcpy(buf, p.decoded.payload.bytes, m);
+  buf[m] = '\0';
 
-    uint32_t lidTmp = 0;
-    ok &= findUInt_(s,"\"lid\"", lidTmp);
-    outLeaderIdNum = (uint8_t)lidTmp;
-
-    ok &= findStr_(s, "\"id\"", outLeader, outLeaderSz);
-    return ok;
+  /* One CSV frame per payload (same as RS485, but over Mesh) */
+  handleLine_(buf);
+  return ProcessMessage::CONTINUE;
 }
-
-bool TrafficLightMeshModule::findUInt_(const char *s, const char *key, uint32_t &out)
-{
-    const char *p = strstr(s, key); if (!p) return false;
-    p = strchr(p, ':');             if (!p) return false;
-    p++;
-    while (*p == ' ') p++;
-    out = (uint32_t)strtoul(p, nullptr, 10);
-    return true;
-}
-bool TrafficLightMeshModule::findU8_(const char *s, const char *key, uint8_t &out)
-{
-    uint32_t tmp = 0;
-    if (!findUInt_(s, key, tmp)) return false;
-    out = (uint8_t)tmp;
-    return true;
-}
-bool TrafficLightMeshModule::findStr_(const char *s, const char *key, char *out, size_t outSz)
-{
-    const char *p = strstr(s, key); if (!p) return false;
-    p = strchr(p, ':');             if (!p) return false;
-    p++;
-    while (*p == ' ') p++;
-    if (*p != '\"') return false;
-    p++;
-    size_t i = 0;
-    while (*p && *p != '\"' && i < outSz - 1) out[i++] = *p++;
-    out[i] = '\0';
-    return (*p == '\"');
-}
-/* ============================================================================== */
-
-/* ===============================[ PRIORITY / ELECTION ]=============================== */
-uint8_t TrafficLightMeshModule::idxInPrioList_(uint8_t id) const
-{
-    for (uint8_t i = 0; i < 3; ++i) if (kPrio_[i] == id) return i;
-    return 3; /* NOT FOUND */
-}
-bool TrafficLightMeshModule::isHigherPriority_(uint8_t a, uint8_t b) const
-{
-    return idxInPrioList_(a) < idxInPrioList_(b);
-}
-uint32_t TrafficLightMeshModule::computeBackoffMs_(uint8_t rank) const
-{
-    const uint32_t base   = ELECTION_BACKOFF_MIN_MS + (rank * (ELECTION_BACKOFF_MIN_MS / 2));
-    const uint32_t jitter = (sem_rand32_() % (ELECTION_BACKOFF_MAX_MS - ELECTION_BACKOFF_MIN_MS + 1));
-    return base + jitter;
-}
-void TrafficLightMeshModule::scheduleHandoverTo_(uint8_t newLeader)
-{
-    leaderId_   = newLeader;
-    handoverAt_ = millis() + HANDOVER_DELAY_MS;
-}
-/* ============================================================================== */

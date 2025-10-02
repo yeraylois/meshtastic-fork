@@ -1,108 +1,110 @@
 #include "configuration.h"
 
 #if !MESHTASTIC_EXCLUDE_INPUTBROKER
-#include "buzz/BuzzerFeedbackThread.h"
-#include "input/ExpressLRSFiveWay.h"
-#include "input/InputBroker.h"
-#include "input/RotaryEncoderInterruptImpl1.h"
-#include "input/SerialKeyboardImpl.h"
-#include "input/TrackballInterruptImpl1.h"
-#include "input/UpDownInterruptImpl1.h"
-#include "modules/SystemCommandsModule.h"
+  #include "input/ExpressLRSFiveWay.h"
+  #include "input/InputBroker.h"
+  #include "input/RotaryEncoderInterruptImpl1.h"
+  #include "input/SerialKeyboardImpl.h"
+  #include "input/TrackballInterruptImpl1.h"
+  #include "input/UpDownInterruptImpl1.h"
+  #include "modules/SystemCommandsModule.h"
 
-#if !MESHTASTIC_EXCLUDE_I2C
-#include "input/cardKbI2cImpl.h"
-#endif
-#include "input/kbMatrixImpl.h"
+  #include "buzz/BuzzerFeedbackThread.h"
+
+  #if !MESHTASTIC_EXCLUDE_I2C
+    #include "input/cardKbI2cImpl.h"
+  #endif
+  #include "input/kbMatrixImpl.h"
 #endif
 #if !MESHTASTIC_EXCLUDE_PKI
-#include "KeyVerificationModule.h"
+  #include "KeyVerificationModule.h"
 #endif
 #if !MESHTASTIC_EXCLUDE_ADMIN
-#include "modules/AdminModule.h"
+  #include "modules/AdminModule.h"
 #endif
 #if !MESHTASTIC_EXCLUDE_ATAK
-#include "modules/AtakPluginModule.h"
+  #include "modules/AtakPluginModule.h"
 #endif
 #if !MESHTASTIC_EXCLUDE_CANNEDMESSAGES
-#include "modules/CannedMessageModule.h"
+  #include "modules/CannedMessageModule.h"
 #endif
 #if !MESHTASTIC_EXCLUDE_DETECTIONSENSOR
-#include "modules/DetectionSensorModule.h"
+  #include "modules/DetectionSensorModule.h"
 #endif
 #if !MESHTASTIC_EXCLUDE_NEIGHBORINFO
-#include "modules/NeighborInfoModule.h"
+  #include "modules/NeighborInfoModule.h"
 #endif
 #if !MESHTASTIC_EXCLUDE_NODEINFO
-#include "modules/NodeInfoModule.h"
+  #include "modules/NodeInfoModule.h"
 #endif
 #if !MESHTASTIC_EXCLUDE_GPS
-#include "modules/PositionModule.h"
+  #include "modules/PositionModule.h"
 #endif
 #if !MESHTASTIC_EXCLUDE_REMOTEHARDWARE
-#include "modules/RemoteHardwareModule.h"
+  #include "modules/RemoteHardwareModule.h"
 #endif
 #if !MESHTASTIC_EXCLUDE_POWERSTRESS
-#include "modules/PowerStressModule.h"
+  #include "modules/PowerStressModule.h"
 #endif
 #include "modules/RoutingModule.h"
 #include "modules/TextMessageModule.h"
 #if !MESHTASTIC_EXCLUDE_TRACEROUTE
-#include "modules/TraceRouteModule.h"
+  #include "modules/TraceRouteModule.h"
 #endif
 #if !MESHTASTIC_EXCLUDE_WAYPOINT
-#include "modules/WaypointModule.h"
+  #include "modules/WaypointModule.h"
 #endif
 #if ARCH_PORTDUINO
-#include "input/LinuxInputImpl.h"
-#include "input/SeesawRotary.h"
-#include "modules/Telemetry/HostMetrics.h"
-#if !MESHTASTIC_EXCLUDE_STOREFORWARD
-#include "modules/StoreForwardModule.h"
-#endif
+  #include "input/LinuxInputImpl.h"
+  #include "input/SeesawRotary.h"
+  #include "modules/Telemetry/HostMetrics.h"
+  #if !MESHTASTIC_EXCLUDE_STOREFORWARD
+    #include "modules/StoreForwardModule.h"
+  #endif
 #endif
 #if HAS_TELEMETRY
-#include "modules/Telemetry/DeviceTelemetry.h"
+  #include "modules/Telemetry/DeviceTelemetry.h"
 #endif
 #if HAS_SENSOR && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
-#include "main.h"
-#include "modules/Telemetry/AirQualityTelemetry.h"
-#include "modules/Telemetry/EnvironmentTelemetry.h"
-#include "modules/Telemetry/HealthTelemetry.h"
-#include "modules/Telemetry/Sensor/TelemetrySensor.h"
+  #include "modules/Telemetry/AirQualityTelemetry.h"
+  #include "modules/Telemetry/EnvironmentTelemetry.h"
+  #include "modules/Telemetry/HealthTelemetry.h"
+  #include "modules/Telemetry/Sensor/TelemetrySensor.h"
+
+  #include "main.h"
 #endif
 #if HAS_TELEMETRY && !MESHTASTIC_EXCLUDE_POWER_TELEMETRY
-#include "modules/Telemetry/PowerTelemetry.h"
+  #include "modules/Telemetry/PowerTelemetry.h"
 #endif
 #if !MESHTASTIC_EXCLUDE_GENERIC_THREAD_MODULE
-#include "modules/GenericThreadModule.h"
+  #include "modules/GenericThreadModule.h"
 #endif
 
 #ifdef ARCH_ESP32
-#if defined(USE_SX1280) && !MESHTASTIC_EXCLUDE_AUDIO
-#include "modules/esp32/AudioModule.h"
-#endif
-#if !MESHTASTIC_EXCLUDE_PAXCOUNTER
-#include "modules/esp32/PaxcounterModule.h"
-#endif
-#if !MESHTASTIC_EXCLUDE_STOREFORWARD
-#include "modules/StoreForwardModule.h"
-#endif
+  #if defined(USE_SX1280) && !MESHTASTIC_EXCLUDE_AUDIO
+    #include "modules/esp32/AudioModule.h"
+  #endif
+  #if !MESHTASTIC_EXCLUDE_PAXCOUNTER
+    #include "modules/esp32/PaxcounterModule.h"
+  #endif
+  #if !MESHTASTIC_EXCLUDE_STOREFORWARD
+    #include "modules/StoreForwardModule.h"
+  #endif
 #endif
 #if defined(ARCH_ESP32) || defined(ARCH_NRF52) || defined(ARCH_RP2040) || defined(ARCH_PORTDUINO)
-#if !MESHTASTIC_EXCLUDE_EXTERNALNOTIFICATION
-#include "modules/ExternalNotificationModule.h"
-#endif
-#if !MESHTASTIC_EXCLUDE_RANGETEST && !MESHTASTIC_EXCLUDE_GPS
-#include "modules/RangeTestModule.h"
-#endif
-#if !defined(CONFIG_IDF_TARGET_ESP32S2) && !MESHTASTIC_EXCLUDE_SERIAL
-#include "modules/SerialModule.h"
-#endif
+  #if !MESHTASTIC_EXCLUDE_EXTERNALNOTIFICATION
+    #include "modules/ExternalNotificationModule.h"
+  #endif
+  #if !MESHTASTIC_EXCLUDE_RANGETEST && !MESHTASTIC_EXCLUDE_GPS
+    #include "modules/RangeTestModule.h"
+  #endif
+  #if !defined(CONFIG_IDF_TARGET_ESP32S2) && !MESHTASTIC_EXCLUDE_SERIAL
+    #include "modules/SerialModule.h"
+  #endif
 #endif
 
 #if !MESHTASTIC_EXCLUDE_DROPZONE
-#include "modules/DropzoneModule.h"
+  #include "modules/DropzoneModule.h"
 #endif
 
 /*****************************************************************************
@@ -121,352 +123,335 @@
 
 // ========================== FEATURE SWITCHES ==========================
 #ifndef WS3_RS485_TALKER_ENABLE
-#define WS3_RS485_TALKER_ENABLE 0 // 1 = ENABLE WS3 MODULE (Heltec Wireless Stick V3)
+  #define WS3_RS485_TALKER_ENABLE 0  // 1 = ENABLE WS3 MODULE (Heltec Wireless Stick V3)
 #endif
 #ifndef WS3_OPTO_PM_ENABLE
-#define WS3_OPTO_PM_ENABLE 0
+  #define WS3_OPTO_PM_ENABLE 0
 #endif
 #ifndef WS3_FLAG_ENABLE
-#define WS3_FLAG_ENABLE 0
+  #define WS3_FLAG_ENABLE 0
 #endif
 //-----------------------------------------------------------------------
 #ifndef T114_RS485_SLAVE_ENABLE
-#define T114_RS485_SLAVE_ENABLE 0 // 1 = ENABLE T114 MODULE (Heltec Mesh Node T114 v2.0)
+  #define T114_RS485_SLAVE_ENABLE 0  // 1 = ENABLE T114 MODULE (Heltec Mesh Node T114 v2.0)
 #endif
 #ifndef T114_OPTO_PM_ENABLE
-#define T114_OPTO_PM_ENABLE 0
+  #define T114_OPTO_PM_ENABLE 0
 #endif
 #ifndef T114_FLAG_ENABLE
-#define T114_FLAG_ENABLE 0
+  #define T114_FLAG_ENABLE 0
 #endif
 //-----------------------------------------------------------------------
 #ifndef PB_FLAG_ENABLE
-#define PB_FLAG_ENABLE 0
+  #define PB_FLAG_ENABLE 0
 #endif
 #ifndef TRAFFIC_LIGHT_MESH_MODULE_ENABLE
-#define TRAFFIC_LIGHT_MESH_MODULE_ENABLE 0
+  #define TRAFFIC_LIGHT_MESH_MODULE_ENABLE 0
 #endif
 
 // ======================================================================
 
 // ==== SANITY CHECK (BOTH MODULE CAN'T BE ENABLED AT THE SAME TIME) ====
 #if WS3_RS485_TALKER_ENABLE && T114_RS485_SLAVE_ENABLE
-#error "ENABLE ONLY ONE MODULE: WS3_RS485_TALKER_ENABLE o T114_RS485_SLAVE_ENABLE"
+  #error "ENABLE ONLY ONE MODULE: WS3_RS485_TALKER_ENABLE o T114_RS485_SLAVE_ENABLE"
 #endif
 
-// ====================================================================== WS3 MODULES (Heltec Wireless Stick v3)
+// ====================================================================== WS3 MODULES (Heltec
+// Wireless Stick v3)
 
 #if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_RS485_TALKER_ENABLE
-#include "modules/Ws3Rs485TalkerModule.h"
+  #include "modules/Ws3Rs485TalkerModule.h"
 #endif
 
 #if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_OPTO_PM_ENABLE
-#include "modules/Ws3OptoPMModule.h"
-#include "modules/Ws3OptoFlagBridgeModule.h"
+  #include "modules/Ws3OptoFlagBridgeModule.h"
+  #include "modules/Ws3OptoPMModule.h"
 #endif
 
 #if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_FLAG_ENABLE
-#include "flags/Ws3FlagStore.h"
+  #include "flags/Ws3FlagStore.h"
 #endif
 
-// ====================================================================== T114 MODULES (Heltec Mesh Node T114 v2.0)
+// ====================================================================== T114 MODULES (Heltec Mesh
+// Node T114 v2.0)
 
 #if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_RS485_SLAVE_ENABLE
-#include "modules/T114Rs485SlaveModule.h"
+  #include "modules/T114Rs485SlaveModule.h"
 #endif
 
 #if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_OPTO_PM_ENABLE
-#include "modules/T114OptoPMModule.h"
-#include "modules/T114OptoFlagBridgeModule.h"
+  #include "modules/T114OptoFlagBridgeModule.h"
+  #include "modules/T114OptoPMModule.h"
 #endif
 
 #if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_FLAG_ENABLE
-#include "flags/T114FlagStore.h"
+  #include "flags/T114FlagStore.h"
 #endif
 
-// ====================================================================== GENERAL MODULES (WS3 & T114)
+// ====================================================================== GENERAL MODULES (WS3 &
+// T114)
 
 #if PB_FLAG_ENABLE
-#include "PowerBudgetModule.h"
+  #include "PowerBudgetModule.h"
 #endif
 
 #if TRAFFIC_LIGHT_MESH_MODULE_ENABLE
-#include "TrafficLightMeshModule.h"
+  #include "TrafficLightMeshModule.h"
 #endif
 
 #if RS485_COORDINATOR_MODULE_ENABLE
-#include "TrafficRs485CoordinatorModule.h"
+  #include "TrafficRs485CoordinatorModule.h"
 #endif
 
 // ======================================================================
 
 /**
- * Create module instances here.  If you are adding a new module, you must 'new' it here (or somewhere else)
+ * Create module instances here.  If you are adding a new module, you must 'new' it here (or
+ * somewhere else)
  */
-void setupModules()
-{
+void setupModules() {
 #if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_FLAG_ENABLE
 
-        // (INIT NVS/flag AND DECIDE PHASE)
-        Ws3FlagStore::begin();
-        const uint32_t flag = Ws3FlagStore::get();
-        LOG_INFO("[MODULES.CPP] WS3 ACTUAL FLAG: 0x%08" PRIX32 "\n", flag);
+  // (INIT NVS/flag AND DECIDE PHASE)
+  Ws3FlagStore::begin();
+  const uint32_t flag = Ws3FlagStore::get();
+  LOG_INFO("[MODULES.CPP] WS3 ACTUAL FLAG: 0x%08" PRIX32 "\n", flag);
 
-        const bool bootstrapPhase = (flag == WS3_FLAG_DEFAULT) || (flag == WS3_FLAG_OPTO_POWER_OK);
+  const bool bootstrapPhase = (flag == WS3_FLAG_DEFAULT) || (flag == WS3_FLAG_OPTO_POWER_OK);
 
-        if (bootstrapPhase)
-        {
-                LOG_INFO("[MODULES.CPP] BOOTSTRAP PHASE (flag = DEFAULT)");
+  if (bootstrapPhase) {
+    LOG_INFO("[MODULES.CPP] BOOTSTRAP PHASE (flag = DEFAULT)");
 
-#if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && RS485_COORDINATOR_MODULE_ENABLE
-                new TrafficRs485CoordinatorModule();
-                // return;
-#endif
+  #if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && RS485_COORDINATOR_MODULE_ENABLE
+    new TrafficRs485CoordinatorModule();
+      // return;
+  #endif
 
-#if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_OPTO_PM_ENABLE
-                new Ws3OptoFlagBridgeModule();
-                // return;
-#endif
-                return;
-        }
-        else
-        {
-                Ws3FlagStore::writeDefault();
-                Ws3FlagStore::print();
-        }
+  #if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_OPTO_PM_ENABLE
+    new Ws3OptoFlagBridgeModule();
+      // return;
+  #endif
+    return;
+  } else {
+    Ws3FlagStore::writeDefault();
+    Ws3FlagStore::print();
+  }
 #endif
 
 #if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_FLAG_ENABLE
 
-        // (INIT GPREGRET2 AND DECIDE PHASE)
-        T114FlagStore::begin();
-        const uint32_t flag = T114FlagStore::get();
-        LOG_INFO("[MODULES.CPP] T114 ACTUAL FLAG: 0x%08" PRIX32 "\n", flag);
+  // (INIT GPREGRET2 AND DECIDE PHASE)
+  T114FlagStore::begin();
+  const uint32_t flag = T114FlagStore::get();
+  LOG_INFO("[MODULES.CPP] T114 ACTUAL FLAG: 0x%08" PRIX32 "\n", flag);
 
-        const bool bootstrapPhase = (flag == T114_FLAG_DEFAULT) || (flag == T114_FLAG_OPTO_POWER_OK);
+  const bool bootstrapPhase = (flag == T114_FLAG_DEFAULT) || (flag == T114_FLAG_OPTO_POWER_OK);
 
-        if (bootstrapPhase)
-        {
-                LOG_INFO("[MODULES.CPP] BOOTSTRAP PHASE (flag = DEFAULT)");
+  if (bootstrapPhase) {
+    LOG_INFO("[MODULES.CPP] BOOTSTRAP PHASE (flag = DEFAULT)");
 
-#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && RS485_COORDINATOR_MODULE_ENABLE
-                new TrafficRs485CoordinatorModule();
-                // return;
-#endif
-#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_OPTO_PM_ENABLE
-                new T114OptoFlagBridgeModule();
-#endif
-                return;
-        }
-        else
-        {
-                T114FlagStore::writeDefault();
-                T114FlagStore::print();
-        }
+  #if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && RS485_COORDINATOR_MODULE_ENABLE
+    new TrafficRs485CoordinatorModule();
+      // return;
+  #endif
+  #if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_OPTO_PM_ENABLE
+    new T114OptoFlagBridgeModule();
+  #endif
+    return;
+  } else {
+    T114FlagStore::writeDefault();
+    T114FlagStore::print();
+  }
 #endif
 
-        // (NORMAL PHASE)
-        LOG_INFO("[MODULES.CPP] NORMAL PHASE (flag != DEFAULT)");
+  // (NORMAL PHASE)
+  LOG_INFO("[MODULES.CPP] NORMAL PHASE (flag != DEFAULT)");
 
 #if PB_FLAG_ENABLE
-        new PowerBudgetModule();
+  new PowerBudgetModule();
 #endif
 
 #if TRAFFIC_LIGHT_MESH_MODULE_ENABLE
-        new TrafficLightMeshModule();
+  new TrafficLightMeshModule();
 #endif
-        /*****************************************************************************
-         * ---------------------------[ END OF MODULE ]----------------------------- *
-         ****************************************************************************/
+  /*****************************************************************************
+   * ---------------------------[ END OF MODULE ]----------------------------- *
+   ****************************************************************************/
 
-        if (config.device.role != meshtastic_Config_DeviceConfig_Role_REPEATER)
-        {
+  if (config.device.role != meshtastic_Config_DeviceConfig_Role_REPEATER) {
 #if (HAS_BUTTON || ARCH_PORTDUINO) && !MESHTASTIC_EXCLUDE_INPUTBROKER
-                if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR)
-                {
-                        inputBroker = new InputBroker();
-                        systemCommandsModule = new SystemCommandsModule();
-                        buzzerFeedbackThread = new BuzzerFeedbackThread();
-                }
+    if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR) {
+      inputBroker          = new InputBroker();
+      systemCommandsModule = new SystemCommandsModule();
+      buzzerFeedbackThread = new BuzzerFeedbackThread();
+    }
 #endif
 #if !MESHTASTIC_EXCLUDE_ADMIN
-                adminModule = new AdminModule();
+    adminModule = new AdminModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_NODEINFO
-                nodeInfoModule = new NodeInfoModule();
+    nodeInfoModule = new NodeInfoModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_GPS
-                positionModule = new PositionModule();
+    positionModule = new PositionModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_WAYPOINT
-                waypointModule = new WaypointModule();
+    waypointModule = new WaypointModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_TEXTMESSAGE
-                textMessageModule = new TextMessageModule();
+    textMessageModule = new TextMessageModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_TRACEROUTE
-                traceRouteModule = new TraceRouteModule();
+    traceRouteModule = new TraceRouteModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_NEIGHBORINFO
-                neighborInfoModule = new NeighborInfoModule();
+    neighborInfoModule = new NeighborInfoModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_DETECTIONSENSOR
-                detectionSensorModule = new DetectionSensorModule();
+    detectionSensorModule = new DetectionSensorModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_ATAK
-                atakPluginModule = new AtakPluginModule();
+    atakPluginModule = new AtakPluginModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_PKI
-                keyVerificationModule = new KeyVerificationModule();
+    keyVerificationModule = new KeyVerificationModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_DROPZONE
-                dropzoneModule = new DropzoneModule();
+    dropzoneModule = new DropzoneModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_GENERIC_THREAD_MODULE
-                new GenericThreadModule();
+    new GenericThreadModule();
 #endif
-                // Note: if the rest of meshtastic doesn't need to explicitly use your module, you do not need to assign the instance
-                // to a global variable.
+    // Note: if the rest of meshtastic doesn't need to explicitly use your module, you do not need
+    // to assign the instance to a global variable.
 
 #if !MESHTASTIC_EXCLUDE_REMOTEHARDWARE
-                new RemoteHardwareModule();
+    new RemoteHardwareModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_POWERSTRESS
-                new PowerStressModule();
+    new PowerStressModule();
 #endif
 
-                /*  Add your custom modules here following Meshtastic's module architecture. *
-                 *  Example:                                                                 *
-                 *    new YourModuleClass();
-                 */
+    /*  Add your custom modules here following Meshtastic's module architecture. *
+     *  Example:                                                                 *
+     *    new YourModuleClass();
+     */
 
 #if (HAS_BUTTON || ARCH_PORTDUINO) && !MESHTASTIC_EXCLUDE_INPUTBROKER
-                if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR)
-                {
-                        rotaryEncoderInterruptImpl1 = new RotaryEncoderInterruptImpl1();
-                        if (!rotaryEncoderInterruptImpl1->init())
-                        {
-                                delete rotaryEncoderInterruptImpl1;
-                                rotaryEncoderInterruptImpl1 = nullptr;
-                        }
-                        upDownInterruptImpl1 = new UpDownInterruptImpl1();
-                        if (!upDownInterruptImpl1->init())
-                        {
-                                delete upDownInterruptImpl1;
-                                upDownInterruptImpl1 = nullptr;
-                        }
-                        cardKbI2cImpl = new CardKbI2cImpl();
-                        cardKbI2cImpl->init();
-#ifdef INPUTBROKER_MATRIX_TYPE
-                        kbMatrixImpl = new KbMatrixImpl();
-                        kbMatrixImpl->init();
-#endif // INPUTBROKER_MATRIX_TYPE
-#ifdef INPUTBROKER_SERIAL_TYPE
-                        aSerialKeyboardImpl = new SerialKeyboardImpl();
-                        aSerialKeyboardImpl->init();
-#endif // INPUTBROKER_MATRIX_TYPE
-                }
-#endif // HAS_BUTTON
+    if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR) {
+      rotaryEncoderInterruptImpl1 = new RotaryEncoderInterruptImpl1();
+      if (!rotaryEncoderInterruptImpl1->init()) {
+        delete rotaryEncoderInterruptImpl1;
+        rotaryEncoderInterruptImpl1 = nullptr;
+      }
+      upDownInterruptImpl1 = new UpDownInterruptImpl1();
+      if (!upDownInterruptImpl1->init()) {
+        delete upDownInterruptImpl1;
+        upDownInterruptImpl1 = nullptr;
+      }
+      cardKbI2cImpl = new CardKbI2cImpl();
+      cardKbI2cImpl->init();
+  #ifdef INPUTBROKER_MATRIX_TYPE
+      kbMatrixImpl = new KbMatrixImpl();
+      kbMatrixImpl->init();
+  #endif  // INPUTBROKER_MATRIX_TYPE
+  #ifdef INPUTBROKER_SERIAL_TYPE
+      aSerialKeyboardImpl = new SerialKeyboardImpl();
+      aSerialKeyboardImpl->init();
+  #endif  // INPUTBROKER_MATRIX_TYPE
+    }
+#endif  // HAS_BUTTON
 #if ARCH_PORTDUINO
-                if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR)
-                {
-                        seesawRotary = new SeesawRotary("SeesawRotary");
-                        if (!seesawRotary->init())
-                        {
-                                delete seesawRotary;
-                                seesawRotary = nullptr;
-                        }
-                        aLinuxInputImpl = new LinuxInputImpl();
-                        aLinuxInputImpl->init();
-                }
+    if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR) {
+      seesawRotary = new SeesawRotary("SeesawRotary");
+      if (!seesawRotary->init()) {
+        delete seesawRotary;
+        seesawRotary = nullptr;
+      }
+      aLinuxInputImpl = new LinuxInputImpl();
+      aLinuxInputImpl->init();
+    }
 #endif
 #if !MESHTASTIC_EXCLUDE_INPUTBROKER
-                if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR)
-                {
-                        trackballInterruptImpl1 = new TrackballInterruptImpl1();
-                        trackballInterruptImpl1->init(TB_DOWN, TB_UP, TB_LEFT, TB_RIGHT, TB_PRESS);
-                }
+    if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR) {
+      trackballInterruptImpl1 = new TrackballInterruptImpl1();
+      trackballInterruptImpl1->init(TB_DOWN, TB_UP, TB_LEFT, TB_RIGHT, TB_PRESS);
+    }
 #endif
 #ifdef INPUTBROKER_EXPRESSLRSFIVEWAY_TYPE
-                expressLRSFiveWayInput = new ExpressLRSFiveWay();
+    expressLRSFiveWayInput = new ExpressLRSFiveWay();
 #endif
 #if HAS_SCREEN && !MESHTASTIC_EXCLUDE_CANNEDMESSAGES
-                if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR)
-                {
-                        cannedMessageModule = new CannedMessageModule();
-                }
+    if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR) {
+      cannedMessageModule = new CannedMessageModule();
+    }
 #endif
 #if ARCH_PORTDUINO
-                new HostMetricsModule();
+    new HostMetricsModule();
 #endif
 #if HAS_TELEMETRY
-                new DeviceTelemetryModule();
+    new DeviceTelemetryModule();
 #endif
 // TODO: How to improve this?
 #if HAS_SENSOR && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
-                new EnvironmentTelemetryModule();
-#if __has_include("Adafruit_PM25AQI.h")
-                if (nodeTelemetrySensorsMap[meshtastic_TelemetrySensorType_PMSA003I].first > 0)
-                {
-                        new AirQualityTelemetryModule();
-                }
-#endif
-#if !MESHTASTIC_EXCLUDE_HEALTH_TELEMETRY
-                if (nodeTelemetrySensorsMap[meshtastic_TelemetrySensorType_MAX30102].first > 0 ||
-                    nodeTelemetrySensorsMap[meshtastic_TelemetrySensorType_MLX90614].first > 0)
-                {
-                        new HealthTelemetryModule();
-                }
-#endif
+    new EnvironmentTelemetryModule();
+  #if __has_include("Adafruit_PM25AQI.h")
+    if (nodeTelemetrySensorsMap[meshtastic_TelemetrySensorType_PMSA003I].first > 0) {
+      new AirQualityTelemetryModule();
+    }
+  #endif
+  #if !MESHTASTIC_EXCLUDE_HEALTH_TELEMETRY
+    if (nodeTelemetrySensorsMap[meshtastic_TelemetrySensorType_MAX30102].first > 0
+        || nodeTelemetrySensorsMap[meshtastic_TelemetrySensorType_MLX90614].first > 0) {
+      new HealthTelemetryModule();
+    }
+  #endif
 #endif
 #if HAS_TELEMETRY && !MESHTASTIC_EXCLUDE_POWER_TELEMETRY && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
-                new PowerTelemetryModule();
+    new PowerTelemetryModule();
 #endif
-#if (defined(ARCH_ESP32) || defined(ARCH_NRF52) || defined(ARCH_RP2040)) && !defined(CONFIG_IDF_TARGET_ESP32S2) && \
-    !defined(CONFIG_IDF_TARGET_ESP32C3)
-#if !MESHTASTIC_EXCLUDE_SERIAL
-                if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR)
-                {
-                        new SerialModule();
-                }
-#endif
+#if (defined(ARCH_ESP32) || defined(ARCH_NRF52) || defined(ARCH_RP2040))                           \
+    && !defined(CONFIG_IDF_TARGET_ESP32S2) && !defined(CONFIG_IDF_TARGET_ESP32C3)
+  #if !MESHTASTIC_EXCLUDE_SERIAL
+    if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR) {
+      new SerialModule();
+    }
+  #endif
 #endif
 #ifdef ARCH_ESP32
-                // Only run on an esp32 based device.
-#if defined(USE_SX1280) && !MESHTASTIC_EXCLUDE_AUDIO
-                audioModule = new AudioModule();
-#endif
-#if !MESHTASTIC_EXCLUDE_PAXCOUNTER
-                paxcounterModule = new PaxcounterModule();
-#endif
+    // Only run on an esp32 based device.
+  #if defined(USE_SX1280) && !MESHTASTIC_EXCLUDE_AUDIO
+    audioModule = new AudioModule();
+  #endif
+  #if !MESHTASTIC_EXCLUDE_PAXCOUNTER
+    paxcounterModule = new PaxcounterModule();
+  #endif
 #endif
 #if defined(ARCH_ESP32) || defined(ARCH_PORTDUINO)
-#if !MESHTASTIC_EXCLUDE_STOREFORWARD
-                storeForwardModule = new StoreForwardModule();
-#endif
+  #if !MESHTASTIC_EXCLUDE_STOREFORWARD
+    storeForwardModule = new StoreForwardModule();
+  #endif
 #endif
 #if defined(ARCH_ESP32) || defined(ARCH_NRF52) || defined(ARCH_RP2040) || defined(ARCH_PORTDUINO)
-#if !MESHTASTIC_EXCLUDE_EXTERNALNOTIFICATION
-                externalNotificationModule = new ExternalNotificationModule();
+  #if !MESHTASTIC_EXCLUDE_EXTERNALNOTIFICATION
+    externalNotificationModule = new ExternalNotificationModule();
+  #endif
+  #if !MESHTASTIC_EXCLUDE_RANGETEST && !MESHTASTIC_EXCLUDE_GPS
+    new RangeTestModule();
+  #endif
 #endif
-#if !MESHTASTIC_EXCLUDE_RANGETEST && !MESHTASTIC_EXCLUDE_GPS
-                new RangeTestModule();
-#endif
-#endif
-        }
-        else
-        {
+  } else {
 #if !MESHTASTIC_EXCLUDE_ADMIN
-                adminModule = new AdminModule();
+    adminModule = new AdminModule();
 #endif
 #if HAS_TELEMETRY
-                new DeviceTelemetryModule();
+    new DeviceTelemetryModule();
 #endif
 #if !MESHTASTIC_EXCLUDE_TRACEROUTE
-                traceRouteModule = new TraceRouteModule();
+    traceRouteModule = new TraceRouteModule();
 #endif
-        }
-        // NOTE! This module must be added LAST because it likes to check for replies from other modules and avoid sending extra
-        // acks
-        routingModule = new RoutingModule();
+  }
+  // NOTE! This module must be added LAST because it likes to check for replies from other modules
+  // and avoid sending extra acks
+  routingModule = new RoutingModule();
 }

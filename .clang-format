@@ -1,0 +1,93 @@
+# ============================================================
+#                          .CLANG-FORMAT
+# ============================================================
+
+# ======= BASE STYLE =======
+BasedOnStyle: LLVM # USE LLVM AS BASE STYLE
+
+# ======= LINE WIDTH AND INDENTATION =======
+ColumnLimit: 100 # MAXIMUM LINE LENGTH = 100 CHARS
+IndentWidth: 2 # INDENTATION = 2 SPACES
+TabWidth: 2 # TAB WIDTH = 2 SPACES
+UseTab: Never # NEVER USE TABS
+ContinuationIndentWidth: 4
+IndentCaseLabels: true
+NamespaceIndentation: None
+FixNamespaceComments: true
+KeepEmptyLinesAtTheStartOfBlocks: false
+
+# ======= BRACES AND ONE-LINERS =======
+BreakBeforeBraces: Attach # KEEP BRACE ATTACHED TO STATEMENT
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty # ONLY EMPTY FUNCTIONS INLINE
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# ======= SPACING RULES =======
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+SpacesInAngles: false
+SpaceAfterCStyleCast: true
+SpaceBeforeAssignmentOperators: true
+SpacesInSquareBrackets: false
+SpaceInEmptyParentheses: false
+
+# ======= POINTERS AND REFERENCES =======
+DerivePointerAlignment: false
+PointerAlignment: Left # ALIGN POINTERS TO TYPE SIDE (*int not int*)
+# NOTE: REFERENCEALIGNMENT EXISTS IN NEWER VERSIONS BUT IS OMITTED HERE FOR COMPATIBILITY
+
+# ======= ARGUMENTS AND PARAMETERS =======
+BinPackArguments: false # NO ARGUMENT PACKING
+BinPackParameters: false # NO PARAMETER PACKING
+Cpp11BracedListStyle: true
+
+# ======= CONSTRUCTOR INITIALIZERS =======
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+ConstructorInitializerIndentWidth: 4
+BreakConstructorInitializers: BeforeComma
+
+# ======= OPERATORS AND TEMPLATES =======
+BreakBeforeBinaryOperators: NonAssignment # BREAK BEFORE NON-ASSIGNMENT OPERATORS
+AlwaysBreakTemplateDeclarations: Yes
+
+# ======= ALIGNMENT =======
+AlignOperands: true
+AlignAfterOpenBracket: Align
+AlignTrailingComments: true
+SpacesBeforeTrailingComments: 2
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveDeclarations: Consecutive
+
+# ======= INCLUDE ORDER AND GROUPS =======
+SortIncludes: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  # 1) STANDARD C/C++ LIBRARIES
+  - Regex: "^<[^/]+>$"
+    Priority: 1
+  # 2) THIRD-PARTY / SYSTEM HEADERS WITH PATH
+  - Regex: "^<.*/.*>$"
+    Priority: 2
+  # 3) PROJECT HEADERS (TYPICAL REPO PATHS)
+  - Regex: '^"(src|mesh|modules|platform|boards|variants|utils|graphics|input|power|mqtt|concurrency|gps)/.*"$'
+    Priority: 3
+  # 4) OTHER LOCAL HEADERS
+  - Regex: '^".+"$'
+    Priority: 4
+
+# ======= PREPROCESSOR RULES =======
+IndentPPDirectives: BeforeHash
+MacroBlockBegin: '^\\s*#\\s*if'
+MacroBlockEnd: '^\\s*#\\s*endif'
+
+# ======= COMMENTS AND USING =======
+ReflowComments: true
+CommentPragmas: "NOLINT.*|clang-format off|clang-format on"
+SortUsingDeclarations: true
+
+# ======= LANGUAGE SPECIFIC RULES =======
+---
+Language: Cpp
+DisableFormat: false

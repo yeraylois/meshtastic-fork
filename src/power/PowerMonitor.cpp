@@ -1,18 +1,21 @@
-/**************************************************************
- *   Project : Blackout Traffic Light System                  *
- *   Author  : Yeray Lois Sanchez                             *
- *   Email   : yerayloissanchez@gmail.com                     *
- **************************************************************/
+/***************************************************************************************************************************************
+ *   Project   : Blackout Traffic Light System                                     * Library   :
+ * Power Monitor                       * Author    : Yeray Lois Sanchez
+ *                                                                        * Email     :
+ * yerayloissanchez@gmail.com                       * Available :
+ * https://github.com/yeraylois/blackout-traffic-light-system/tree/main/firmware/common/libraries/PowerMonitor
+ *            *
+ ****************************************************************************************************************************************/
 
 #include "PowerMonitor.h"
 
-static uint8_t   _pinInput;
-static uint8_t   _pinLed;
-static bool      _invert        = false;
-static uint16_t  _debounce      = 0;
-static bool      _lastStatus    = false;
-static uint32_t  _lastChangeMs  = 0;
-static void    (*_onChangeCb)(bool) = nullptr;
+static uint8_t  _pinInput;
+static uint8_t  _pinLed;
+static bool     _invert          = false;
+static uint16_t _debounce        = 0;
+static bool     _lastStatus      = false;
+static uint32_t _lastChangeMs    = 0;
+static void (*_onChangeCb)(bool) = nullptr;
 
 /**
  * INITIALIZE THE MONITOR: SETUP INPUT AND LED PINS
@@ -21,7 +24,7 @@ void PM_init(uint8_t inputPin, uint8_t ledPin, bool inputPullup) {
   _pinInput = inputPin;
   _pinLed   = ledPin;
   pinMode(_pinInput, inputPullup ? INPUT_PULLUP : INPUT);
-  pinMode(_pinLed,   OUTPUT);
+  pinMode(_pinLed, OUTPUT);
   digitalWrite(_pinLed, LOW);
 }
 
@@ -37,8 +40,8 @@ bool PM_readRaw() {
  * RETURN TRUE IF POWER IS OK (RAW == HIGH, AFTER INVERSION AND DEBOUNCE)
  */
 bool PM_isPowerOk() {
-  bool current = PM_readRaw();
-  uint32_t now = millis();
+  bool     current = PM_readRaw();
+  uint32_t now     = millis();
 
   if (_debounce > 0) {
     if (current != _lastStatus && (now - _lastChangeMs) < _debounce) {
@@ -48,12 +51,14 @@ bool PM_isPowerOk() {
     if (current != _lastStatus) {
       _lastStatus   = current;
       _lastChangeMs = now;
-      if (_onChangeCb) _onChangeCb(current);
+      if (_onChangeCb)
+        _onChangeCb(current);
     }
   } else {
     if (current != _lastStatus) {
       _lastStatus = current;
-      if (_onChangeCb) _onChangeCb(current);
+      if (_onChangeCb)
+        _onChangeCb(current);
     }
   }
   return _lastStatus;
