@@ -49,3 +49,6 @@ default.profraw
 *.profdata
 
 .cov_orchestrator/
+
+# NOTES FOR TESTING PURPOSES
+test/test_t114_opto_flag_bridge/README.txt

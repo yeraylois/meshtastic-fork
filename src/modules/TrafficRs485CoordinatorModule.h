@@ -361,6 +361,7 @@ private:
   void        driveOutputs_();
   void        applyIntersectionCase_(uint8_t c);
   void        applyAllRed_();
+  void        applySafetyOutputs_();
   void        applyAmberTransitionForIntersection_();
 
   /* ---------- STATE ---------- */
