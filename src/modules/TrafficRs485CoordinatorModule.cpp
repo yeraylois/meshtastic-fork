@@ -272,6 +272,14 @@ void TrafficRs485CoordinatorModule::applyAllRed_() {
   driveOutputs_();
 }
 
+void TrafficRs485CoordinatorModule::applySafetyOutputs_() {
+  for (uint8_t i = 0; i < VM_COUNT; ++i)
+    vState_[i] = L_AMBER_FLASH;
+  for (uint8_t i = 0; i < PX_COUNT; ++i)
+    pGreen_[i] = false;
+  driveOutputs_();
+}
+
 void TrafficRs485CoordinatorModule::applyAmberTransitionForIntersection_() {
   for (uint8_t i = 0; i < VM_COUNT; ++i)
     vState_[i] = L_RED;
@@ -782,11 +790,13 @@ void TrafficRs485CoordinatorModule::followerTick_() {
   if (!inSafety_ && lastBeaconRxMs_ != 0
       && (int32_t) (now - lastBeaconRxMs_) > (int32_t) RS485_LOSS_TIMEOUT_MS) {
     inSafety_ = true;
+    applySafetyOutputs_();
     scheduleElectionBackoff_();
     LOG_WARN("safety_enter (no beacon > %u ms)\n", (unsigned) RS485_LOSS_TIMEOUT_MS);
   }
 
   if (inSafety_) {
+    applySafetyOutputs_();
     applySafetyBlink();
 
     /** STARTUP LOWER-ID POLICY:
