@@ -1,9 +1,9 @@
 /**************************************************************
  *  Project : Blackout Traffic Light System                    *
- *  Module  : Optoacoupler & Reboot (Heltec Mesh Node T114)    *
+ *  Module  : Optocoupler & Flag Bridge (Heltec Mesh Node T114)*
  *  Author  : Yeray Lois Sanchez                               *
  *  Email   : yerayloissanchez@gmail.com                       *
- ***************************************************************/
+ **************************************************************/
 #pragma once
 #if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0)
 
@@ -33,24 +33,23 @@
       } while (0)
   #endif
 
-  // ======= PINS/CONFIG (T114 v2.0) =======
+  // ======= PIN / CONFIG (T114 v2.0) =======
   #ifndef T114_OPTO_PM_PIN
-    #define T114_OPTO_PM_PIN 33
-  #endif
-  #ifndef T114_OPTO_PM_LED
-    #define T114_OPTO_PM_LED 7
-  #endif
-  #ifndef T114_OPTO_PM_PULLUP
-    #define T114_OPTO_PM_PULLUP 0
-  #endif
-  #ifndef T114_OPTO_PM_DEBOUNCE_MS
-    #define T114_OPTO_PM_DEBOUNCE_MS 50
-  #endif
-  #ifndef T114_OPTO_PM_PRINT_PERIOD_MS
-    #define T114_OPTO_PM_PRINT_PERIOD_MS 500
+    #define T114_OPTO_PM_PIN 33  // OPTOCOUPLER COLLECTOR PIN (GPIO33)
   #endif
 
-  // ======= WRITE POLICY / FLAGS =======
+  // ======= DIAG / BYPASS =======
+  #ifndef T114_OPTO_BYPASS_FILTER
+    #define T114_OPTO_BYPASS_FILTER 0  // [0=USE FILTER, 1=MIRROR RAW(NOT RECOMMENDED)]
+  #endif
+  #ifndef T114_OPTO_FORCE_PINMODE_MS
+    #define T114_OPTO_FORCE_PINMODE_MS 100  // PERIODIC RE-ASSERTION OF PINMODE
+  #endif
+  #ifndef T114_OPTO_DEBUG_PRINT_MS
+    #define T114_OPTO_DEBUG_PRINT_MS 500  // PERIODIC DEBUG PRINT
+  #endif
+
+  // ======= FLAGS =======
   #ifndef T114_FLAG_DEFAULT
     #define T114_FLAG_DEFAULT 0xCAFEBABEUL
   #endif
@@ -61,10 +60,24 @@
     #define T114_FLAG_OPTO_POWER_DOWN 0xAABBCC00UL
   #endif
   #ifndef T114_OPTO_MIN_WRITE_MS
-    #define T114_OPTO_MIN_WRITE_MS 2000
+    #define T114_OPTO_MIN_WRITE_MS 2000  // GUARD TIME BETWEEN FLAG WRITES (ms)
   #endif
   #ifndef T114_OPTO_REBOOT_ON_CHANGE
-    #define T114_OPTO_REBOOT_ON_CHANGE 0  // [1=REBOOT, 0=NO REBOOT]
+    #define T114_OPTO_REBOOT_ON_CHANGE 1  // REBOOT ONLY AFTER N SAMPLES CONFIRM CHANGE
+  #endif
+
+  // ======= PERSISTENCE FILTER (N samples + boot blind) =======
+  #ifndef T114_OPTO_SAMPLE_MS
+    #define T114_OPTO_SAMPLE_MS 50  // SAMPLING PERIOD (MS)
+  #endif
+  #ifndef T114_OPTO_N_LOSS
+    #define T114_OPTO_N_LOSS 60  // ~3.0 s to accept 'BATTERY'
+  #endif
+  #ifndef T114_OPTO_N_GAIN
+    #define T114_OPTO_N_GAIN 20  // ~1.0 s to accept 'CABLE'
+  #endif
+  #ifndef T114_OPTO_BOOT_BLIND_MS
+    #define T114_OPTO_BOOT_BLIND_MS 1000  // IGNORE EARLY TRANSIENTS AT BOOT (MS)
   #endif
 
 class T114OptoFlagBridgeModule final : public SinglePortModule, public concurrency::OSThread {
@@ -85,11 +98,21 @@ private:
   void initOnce();
   void handleEdge(bool powerOk);
   void printStatus(bool powerOk);
+  bool readRaw();  // LOW = CABLE, HIGH = BATTERY
 
-  bool     ready_       = false;
-  bool     lastPowerOk_ = true;
-  uint32_t tNextPrint_  = 0;
-  uint32_t tWriteGuard_ = 0;  // NO-DEBOUNCE WRITE
+  bool ready_ = false;
+
+  // STABLE DECISION AND COUNTERS
+  bool     stablePowerOk_ = true;
+  uint16_t cntLoss_       = 0;
+  uint16_t cntGain_       = 0;
+
+  // TIMERS
+  uint32_t tNextSample_      = 0;
+  uint32_t tBootBlindEnd_    = 0;
+  uint32_t tNextPrint_       = 0;
+  uint32_t tWriteGuard_      = 0;
+  uint32_t tPinModeReassert_ = 0;
 };
 
-#endif  // BOARD_HELTEC_MESH_NODE_T114_V2_0
+#endif
