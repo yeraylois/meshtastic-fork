@@ -210,7 +210,7 @@
  * somewhere else)
  */
 void setupModules() {
-#if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_FLAG_ENABLE
+#if defined(BOARD_HELTEC_WIRELESS_STICK_V3) && WS3_FLAG_ENABLE /* ----[WS3]----*/
 
   // (INIT NVS/flag AND DECIDE PHASE)
   Ws3FlagStore::begin();
@@ -238,7 +238,7 @@ void setupModules() {
   }
 #endif
 
-#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_FLAG_ENABLE
+#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_FLAG_ENABLE /* ----[T114]----*/
 
   // (INIT GPREGRET2 AND DECIDE PHASE)
   T114FlagStore::begin();
@@ -269,6 +269,11 @@ void setupModules() {
 
 #if PB_FLAG_ENABLE
   new PowerBudgetModule();
+#endif
+
+/* RECOVERY GUARD */
+#if defined(BOARD_HELTEC_MESH_NODE_T114_V2_0) && T114_OPTO_PM_ENABLE
+  new T114OptoFlagBridgeModule();
 #endif
 
 #if TRAFFIC_LIGHT_MESH_MODULE_ENABLE
