@@ -13,6 +13,9 @@
 #include "mesh/SinglePortModule.h"
 #include "mesh/generated/meshtastic/portnums.pb.h"
 
+/* SHARED ENUMS (VM_*, PX_*, LIGHTSTATE) */
+#include "modules/TrafficCommonEnums.h"
+
 /* =======================[ DEFAULT CONFIG (OVERRIDE VIA -D ...) ]=======================
  *  ROLE:
  *    -DROLE_LEADER                  -> START AS LEADER; OTHERWISE FOLLOWER
@@ -163,14 +166,9 @@
   #define RS485_PRIO2 2
 #endif
 
-/* ==========================[ VEHICLE HEAD MOVEMENTS ]========================== */
-/* S2N: SOUTH->NORTH,
- * S2W: SOUTH->WEST,
- * N2S: NORTH->SOUTH,
- * N2W: NORTH->WEST,
- * W2N: WEST->NORTH,
- * W2S: WEST->SOUTH */
-enum : uint8_t { VM_S2N = 0, VM_S2W, VM_N2S, VM_N2W, VM_W2N, VM_W2S, VM_COUNT };
+/* ==========================[ VEHICLE HEAD MOVEMENTS ]==========================
+ * SEE: modules/TrafficCommonEnums.h (VM_*)
+ * ============================================================================*/
 
 /* EACH MOVEMENT HAS R/A/G PINS. DEFAULTS TO -1 (DISABLED) VIA -D IN .INI */
 #ifndef RS485_V_S2N_R_PIN
@@ -228,14 +226,9 @@ enum : uint8_t { VM_S2N = 0, VM_S2W, VM_N2S, VM_N2W, VM_W2N, VM_W2S, VM_COUNT };
   #define RS485_V_W2S_G_PIN -1
 #endif
 
-/* ==========================[ PEDESTRIAN CROSSINGS ]============================ */
-/* PX_N1,
- * PX_S1,
- * PX_W2,
- * PX_S2,
- * PX_N2,
- * PX_W1 */
-enum : uint8_t { PX_N1 = 0, PX_S1, PX_W2, PX_S2, PX_N2, PX_W1, PX_COUNT };
+/* ==========================[ PEDESTRIAN CROSSINGS ]============================
+ * SEE: modules/TrafficCommonEnums.h (PX_*)
+ * ============================================================================*/
 
 /* EACH PEDESTRIAN HAS R/G PINS (ACTIVE HIGH ON GREEN, RED = !GREEN) */
 #ifndef RS485_P_N1_R_PIN
@@ -275,8 +268,9 @@ enum : uint8_t { PX_N1 = 0, PX_S1, PX_W2, PX_S2, PX_N2, PX_W1, PX_COUNT };
   #define RS485_P_W1_G_PIN -1
 #endif
 
-/* ===========================[ LIGHT STATES (VEHICLE) ]========================= */
-enum LightState : uint8_t { L_RED = 0, L_GREEN, L_AMBER_FIXED, L_AMBER_FLASH };
+/* ===========================[ LIGHT STATES (VEHICLE) ]=========================
+ * SEE: modules/TrafficCommonEnums.h (LIGHTSTATE)
+ * ============================================================================*/
 
 /* ===============================[ MAIN CLASS ]================================ */
 class TrafficRs485CoordinatorModule final : public SinglePortModule, public concurrency::OSThread {

@@ -11,7 +11,9 @@
 #include <platform/nrf52/softdevice/nrf_soc.h>  // FOR FUNCTION: sd_power_gpregret_{get,set,clr}()
 
 // MMIO (FALLBACK WHEN 'SD' IS DISABLED)
-#define NRF_POWER_BASE (0x40000000UL)
+#ifndef NRF_POWER_BASE
+  #define NRF_POWER_BASE (0x40000000UL)
+#endif
 #define GPREGRET_ADDR                                                                              \
   (NRF_POWER_BASE + 0x0000051CUL)  // DONT USE THIS BUT COULD BE USEFUL IN FUTURE IMPROVEMENTS
 

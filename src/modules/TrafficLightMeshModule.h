@@ -12,6 +12,9 @@
 #include "mesh/SinglePortModule.h"
 #include "mesh/generated/meshtastic/portnums.pb.h"
 
+/* SHARED ENUMS (VM_*, PX_*, LIGHTSTATE) */
+#include "modules/TrafficCommonEnums.h"
+
 /* =======================[ DEFAULT CONFIG (OVERRIDE VIA -D ...) ]=======================
  *  ROLE:
  *    -DROLE_LEADER                      -> START AS LEADER; OTHERWISE FOLLOWER
@@ -143,8 +146,9 @@
   #define SEM_MESH_PRIO2 2
 #endif
 
-/* ==========================[ VEHICLE HEAD MOVEMENTS ]========================== */
-enum : uint8_t { VM_S2N = 0, VM_S2W, VM_N2S, VM_N2W, VM_W2N, VM_W2S, VM_COUNT };
+/* ==========================[ VEHICLE HEAD MOVEMENTS ]==========================
+ * SEE: modules/TrafficCommonEnums.h (VM_*)
+ * ============================================================================*/
 
 /* EACH MOVEMENT HAS R/A/G PINS. DEFAULTS TO -1 (DISABLED) */
 #ifndef SEM_MESH_V_S2N_R_PIN
@@ -202,8 +206,9 @@ enum : uint8_t { VM_S2N = 0, VM_S2W, VM_N2S, VM_N2W, VM_W2N, VM_W2S, VM_COUNT };
   #define SEM_MESH_V_W2S_G_PIN -1
 #endif
 
-/* ==========================[ PEDESTRIAN CROSSINGS ]============================ */
-enum : uint8_t { PX_N1 = 0, PX_S1, PX_W2, PX_S2, PX_N2, PX_W1, PX_COUNT };
+/* ==========================[ PEDESTRIAN CROSSINGS ]============================
+ * SEE: modules/TrafficCommonEnums.h (PX_*)
+ * ============================================================================*/
 
 #ifndef SEM_MESH_P_N1_R_PIN
   #define SEM_MESH_P_N1_R_PIN -1
@@ -242,8 +247,9 @@ enum : uint8_t { PX_N1 = 0, PX_S1, PX_W2, PX_S2, PX_N2, PX_W1, PX_COUNT };
   #define SEM_MESH_P_W1_G_PIN -1
 #endif
 
-/* ===========================[ LIGHT STATES (VEHICLE) ]========================= */
-enum LightState : uint8_t { L_RED = 0, L_GREEN, L_AMBER_FIXED, L_AMBER_FLASH };
+/* ===========================[ LIGHT STATES (VEHICLE) ]=========================
+ * SEE: modules/TrafficCommonEnums.h (LIGHTSTATE)
+ * ============================================================================*/
 
 /* ===============================[ MAIN CLASS ]================================ */
 class TrafficLightMeshModule final : public SinglePortModule, public concurrency::OSThread {
